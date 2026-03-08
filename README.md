@@ -25,6 +25,41 @@ A privacy-first voice assistant built with Rust and Tauri. Speak a command — J
 
 ---
 
+## Commands & Scripts Visual Guide
+
+Below is an overview of the key features added in this fork, illustrated with the new interface elements.
+
+### 1. Command Editor
+
+A **Command** is a single action triggered by a specific voice phrase. You can now manage them entirely through the GUI.
+
+![JARVIS Command Editor](CommandEditor.jpg)
+
+* **Action Types**: Supports launching applications (`EXE APP`), opening URLs (`CHROME / URL`), terminal commands (`CLI / POWERSHELL`), and voice-only intents (`VOICE ONLY`).
+* **Multi-language Support**: Define different trigger phrases for various languages (e.g., English and Russian) within the same command.
+* **Response Sound**: Assign a specific audio response that plays when this command is triggered (overrides the default voice pack).
+
+### 2. Script Editor & Step Builder
+
+A **Script** allows you to automate a **multi-step workflow**. It is a powerful tool for creating complex automation scenarios.
+
+![JARVIS Script Editor](ScriptEditor.jpg)
+
+* **Execution Mode**: Run steps one by one (`Sequential`) or all at once (`Parallel`).
+* **Visual Step Builder**: Add actions via the "+ Add Step" button. Supports delays, cross-command references, Spotify controls, and custom Shell scripts.
+
+### 3. Sound Manager
+
+A new dedicated section in Settings to manage all of the assistant's audio feedback.
+
+![JARVIS Sound Manager](SoundManager.jpg)
+
+* **Browse & Preview**: View all available files in the current voice pack with instant playback for testing.
+* **Import Sounds**: The "+ Добавить звук" button allows you to quickly import your own WAV files into the project.
+* **Categories**: Easy filtering of sounds by category (e.g., `custom`, `system`).
+
+---
+
 ## System Requirements
 
 | Requirement | Minimum | Recommended |
