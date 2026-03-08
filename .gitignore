@@ -1,0 +1,53 @@
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Editor ────────────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── Rust / Cargo ──────────────────────────────────────────────────────────────
+/target/
+**/target/
+
+# Rust compilation artifacts
+*.rlib
+*.rmeta
+*.rs.bk
+*.crate
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+node_modules/
+
+# ── AI / STT Models (download via setup.ps1) ──────────────────────────────────
+resources/vosk/
+resources/models/
+resources/vosk-api-*
+
+# ── Runtime binaries at repo root (present in lib/windows/amd64/) ─────────────
+/libvosk.dll
+
+# ── Internal / Dev files ──────────────────────────────────────────────────────
+.claude/
+.serena/
+CLAUDE.md
+tsk.md
+__other/
+list.py
+tree.txt
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.psd

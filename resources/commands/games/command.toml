@@ -1,0 +1,60 @@
+# ВАЖНО: в TOML пути Windows пишутся с двойным \\ или прямым /
+
+# ── Steam ─────────────────────────────────────────────────────────────────────
+[[commands]]
+id = "launch_steam"
+type = "exe"
+exe_path = "C:\\Program Files (x86)\\Steam\\steam.exe"
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["открой стим", "запусти стим", "стим", "включи стим"]
+phrases.en = ["open steam", "launch steam", "start steam", "steam"]
+phrases.ua = ["відкрий стім", "запусти стім", "стім"]
+patterns = ["стим[а-яё]*|стім[а-яіє]*|steam"]
+
+
+# ── Ведьмак 3 ─────────────────────────────────────────────────────────────────
+[[commands]]
+id = "launch_witcher3"
+type = "exe"
+exe_path = "D:\\Games\\TheWitcher3\\REDprelauncher.exe"
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = [
+    "запусти ведьмака", "открой ведьмака", "ведьмак",
+    "запусти ведьмак три", "играть в ведьмака", "включи ведьмака",
+    "ведьмак три", "включи ведьмак", "запусти ведьмак",
+]
+phrases.ua = ["запусти відьмака", "відьмак", "пограти у відьмака"]
+patterns = ["вед[её]?мак[а-яё]*|відьмак[а-яіїє]*|witcher"]
+
+
+# ── Cyberpunk 2077 ────────────────────────────────────────────────────────────
+[[commands]]
+id = "launch_cyberpunk"
+type = "exe"
+exe_path = "D:\\Games\\Cyberpunk 2077\\bin\\x64\\Cyberpunk2077.exe"
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = [
+    "запусти киберпанк", "открой киберпанк", "киберпанк",
+    "играть в киберпанк", "включи киберпанк", "кибер панк",
+    "запусти cyberpunk", "cyberpunk",
+]
+phrases.ua = ["запусти кіберпанк", "кіберпанк", "кібер панк"]
+patterns = ["кибер|кібер|cyberpunk|cyber"]
+
+
+# ── Notepad++ ─────────────────────────────────────────────────────────────────
+[[commands]]
+id = "launch_notepad"
+type = "exe"
+exe_path = "C:\\Program Files\\Notepad++\\notepad++.exe"
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["открой блокнот", "запусти блокнот", "нотпад", "открой текстовый редактор"]
+phrases.en = ["open notepad", "launch notepad", "text editor"]
+phrases.ua = ["відкрий блокнот", "запусти блокнот", "нотпад"]
+patterns = ["блокнот|нотпад|notepad"]

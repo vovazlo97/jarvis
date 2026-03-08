@@ -1,0 +1,42 @@
+# ── Приветствие ───────────────────────────────────────────────────────────────
+[[commands]]
+id = "greet"
+type = "voice"
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["привет", "здравствуй", "привет джарвис", "здравствуй джарвис", "как дела"]
+phrases.en = ["hello", "hi", "hello jarvis", "hey jarvis", "how are you"]
+phrases.ua = ["привіт", "вітаю", "привіт джарвіс", "як справи"]
+patterns = ["^привет$|^здравствуй$|^hello$|^hi$|^вітаю$"]
+
+
+# ── Текущее время ─────────────────────────────────────────────────────────────
+[[commands]]
+id = "tell_time"
+type = "cli"
+cli_cmd = "powershell"
+cli_args = [
+    "-NoProfile", "-WindowStyle", "Hidden", "-Command",
+    "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show([DateTime]::Now.ToString('HH:mm'), 'Время')"
+]
+sounds.ru = ["ok1", "ok2", "ok3"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3"]
+phrases.ru = ["который час", "сколько времени", "текущее время", "что за время", "скажи время"]
+phrases.en = ["what time is it", "current time", "what is the time", "tell me the time"]
+phrases.ua = ["котра година", "скільки часу", "поточний час"]
+patterns = ["котор|времен|час$|time is|o.clock|година"]
+
+
+# ── Завершить Jarvis ───────────────────────────────────────────────────────────
+[[commands]]
+id = "terminate"
+type = "terminate"
+sounds.ru = ["ok1", "ok2"]
+sounds.en = ["ok1", "ok2"]
+sounds.ua = ["ok1", "ok2"]
+phrases.ru = ["выключись", "завершись", "стоп джарвис", "выйди", "отключись", "выключи джарвис"]
+phrases.en = ["shutdown", "exit", "stop jarvis", "quit", "turn off jarvis"]
+phrases.ua = ["вимкнись", "завершись", "стоп джарвіс"]
+patterns = ["выключись|выключи\\s+джарвис|стоп\\s+джарвис|stop\\s+jarvis|shut\\s*down\\s+jarvis"]

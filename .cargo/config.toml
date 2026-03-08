@@ -1,0 +1,5 @@
+# Workspace-level Cargo configuration
+
+[target.x86_64-pc-windows-msvc]
+# Point linker to native Vosk SDK library (libvosk.lib + libvosk.dll)
+rustflags = ["-L", "lib/windows/amd64"]

@@ -1,0 +1,76 @@
+# Все браузерные команды запускают Chrome напрямую.
+# Если Chrome не по стандартному пути — измени exe_path ниже.
+# exe_args — аргументы, которые передаются Chrome (URL или пусто).
+
+# ── Открыть браузер (без сайта) ───────────────────────────────────────────────
+[[commands]]
+id = "browser_open"
+type = "exe"
+exe_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+exe_args = []
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["открой браузер", "запусти браузер", "нужен браузер", "включи браузер"]
+phrases.en = ["open browser", "launch browser", "start browser", "i need browser"]
+phrases.ua = ["відкрий браузер", "запусти браузер", "увімкни браузер", "потрібен браузер"]
+
+
+# ── YouTube ───────────────────────────────────────────────────────────────────
+[[commands]]
+id = "open_youtube"
+type = "exe"
+exe_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+exe_args = ["https://youtube.com"]
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["открой ютуб", "запусти ютуб", "включи ютуб", "зайди на ютуб", "ютуб"]
+phrases.en = ["open youtube", "launch youtube", "go to youtube", "youtube"]
+phrases.ua = ["відкрий ютуб", "запусти ютуб", "зайди на ютуб", "ютуб"]
+patterns = ["ютуб[а-яё]*|youtube"]
+
+
+# ── Google ────────────────────────────────────────────────────────────────────
+[[commands]]
+id = "open_google"
+type = "exe"
+exe_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+exe_args = ["https://google.com"]
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["открой гугл", "запусти гугл", "зайди в гугл", "гугл поиск", "гугл"]
+phrases.en = ["open google", "launch google", "go to google", "google search", "google"]
+phrases.ua = ["відкрий гугл", "запусти гугл", "зайди в гугл", "гугл"]
+patterns = ["гугл|google"]
+
+
+# ── GitHub ────────────────────────────────────────────────────────────────────
+[[commands]]
+id = "open_github"
+type = "exe"
+exe_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+exe_args = ["https://github.com"]
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["открой гитхаб", "зайди на гитхаб", "гитхаб"]
+phrases.en = ["open github", "go to github", "github"]
+phrases.ua = ["відкрий гітхаб", "гітхаб"]
+patterns = ["гитхаб|гітхаб|github"]
+
+
+# ── Закрыть браузер ───────────────────────────────────────────────────────────
+[[commands]]
+id = "browser_close"
+type = "cli"
+cli_cmd = "powershell"
+cli_args = ["-Command", "Get-Process chrome,msedge,firefox -ErrorAction SilentlyContinue | Stop-Process -Force"]
+sounds.ru = ["ok1", "ok2", "ok3", "ok4"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]
+phrases.ru = ["закрой браузер", "закрой все браузеры", "выключи браузер", "убери браузер"]
+phrases.en = ["close browser", "close all browsers", "shut down browser"]
+phrases.ua = ["закрий браузер", "закрий всі браузери", "вимкни браузер"]
+patterns = ["закрой\\s+браузер|закрий\\s+браузер"]
