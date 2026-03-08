@@ -199,7 +199,8 @@ fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
 
     // Use the harmonic mean — both sides must match well
     if trigger_coverage + input_coverage < 1e-9 { return 0.0; }
-    (2.0 * trigger_coverage * input_coverage / (trigger_coverage + input_coverage)) * 100.0
+    // ratio() already returns 0-100, so harmonic mean is already in 0-100 range — no extra scaling needed
+    2.0 * trigger_coverage * input_coverage / (trigger_coverage + input_coverage)
 }
 
 // ── Execution ─────────────────────────────────────────────────────────────────
