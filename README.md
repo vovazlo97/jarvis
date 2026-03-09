@@ -76,6 +76,20 @@ A new dedicated section in Settings to manage all of the assistant's audio feedb
 
 ---
 
+## System Prerequisites (Windows)
+
+Before installing Rust, install the **Microsoft C++ Build Tools** — required by Rust's MSVC toolchain to compile native dependencies (Vosk, audio libraries):
+
+1. Download the installer from [https://visualstudio.microsoft.com/visual-cpp-build-tools/](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. In the Visual Studio Installer, select the **"Desktop development with C++"** workload
+3. Click **Install** and wait for it to complete (~5–8 GB)
+
+> If you already have **Visual Studio 2019/2022** with the C++ workload installed, skip this step.
+
+Without the C++ Build Tools, `cargo build -p jarvis-app` will fail with a linker error even if `libvosk.lib` is present in the repository.
+
+---
+
 ## Installation
 
 ### Option A — Automatic (recommended)
@@ -87,13 +101,19 @@ One script handles everything: checks dependencies, downloads Vosk speech models
 git clone https://github.com/vovazlo97/jarvis.git
 cd jarvis
 
-# 2. Run setup (downloads models, installs npm packages)
+# 2. Run setup (downloads Vosk models, installs npm packages)
 powershell -ExecutionPolicy Bypass -File setup.ps1
 
-# 3. Start the app
+# 3. Build and start the backend voice engine (Terminal 1)
+cargo build -p jarvis-app
+.\target\debug\jarvis-app.exe
+
+# 4. In a NEW terminal — start the GUI
 cd crates/jarvis-gui
 cargo tauri dev
 ```
+
+> **Two terminals are required.** `jarvis-app` (voice engine) and `jarvis-gui` (configuration window) are separate processes that must both run at the same time.
 
 > First build takes **5–15 minutes** — Rust compiles all dependencies from scratch. Subsequent builds are incremental (under 1 minute).
 
@@ -179,7 +199,27 @@ cd ..
 
 ---
 
-**Step 7 — Start the application**
+**Step 7 — Running in Development Mode**
+
+The application is made of **two separate processes** that must both run simultaneously:
+
+| Process | Crate | Role |
+|---|---|---|
+| `jarvis-app.exe` | `crates/jarvis-app` | Voice engine: wake word → STT → command routing |
+| `jarvis-gui` (Tauri window) | `crates/jarvis-gui` | Configuration GUI |
+
+**Terminal 1 — Build and start the backend:**
+
+```powershell
+# From the repository root
+# DLLs from lib/windows/amd64/ are copied automatically by build.rs
+cargo build -p jarvis-app
+.\target\debug\jarvis-app.exe
+```
+
+Leave this terminal open. The backend prints logs and listens for the wake word.
+
+**Terminal 2 — Start the GUI:**
 
 ```powershell
 cd crates/jarvis-gui
@@ -187,6 +227,55 @@ cargo tauri dev
 ```
 
 During the first build, `fastembed` will also download embedding models (~100 MB) automatically. Just let it finish.
+
+> **Why two terminals?** `cargo tauri dev` only builds `jarvis-gui`. It does not build or launch `jarvis-app`. The two processes communicate via IPC — they must both be running for voice commands to work.
+
+**Debug logging** (run before launching each process):
+
+```powershell
+# Terminal 1 — backend with full logging
+$env:RUST_LOG = "debug"
+.\target\debug\jarvis-app.exe
+
+# Terminal 2 — GUI with full logging
+$env:RUST_LOG = "debug"
+cd crates/jarvis-gui
+cargo tauri dev
+```
+
+---
+
+**Step 8 — Building for Production**
+
+### Step 8a — Build the backend binary
+
+```powershell
+# From the repository root
+cargo build --release -p jarvis-app
+# Output: target/release/jarvis-app.exe
+```
+
+### Step 8b — Build the Tauri installer
+
+```powershell
+cd crates/jarvis-gui
+cargo tauri build
+# Output: target/release/bundle/nsis/jarvis-app_<version>_x64-setup.exe
+#         target/release/bundle/msi/jarvis-app_<version>_x64_en-US.msi
+```
+
+### Step 8c — Copy the backend into the release folder
+
+The Tauri installer **does not yet bundle `jarvis-app.exe` automatically** (see [Required Config Changes](#required-config-changes) below for how to fix this). Until that is applied, copy manually:
+
+```powershell
+# Run from the repository root
+Copy-Item target\release\jarvis-app.exe -Destination target\release\
+```
+
+All DLLs (`libvosk.dll`, `libpv_recorder.dll`, etc.) from `lib/windows/amd64/` are bundled into the installer automatically via the `bundle.resources` setting in `tauri.conf.json`.
+
+To distribute, ship the installer **and** `jarvis-app.exe` together, or place `jarvis-app.exe` in the same folder as the installed `jarvis-gui.exe`.
 
 ---
 
@@ -417,6 +506,56 @@ Click **Save**.
 
 ---
 
+## Required Config Changes
+
+> These changes are **not yet applied** to the repository. They are needed to make production builds fully automatic — so `jarvis-app.exe` is bundled into the installer and launched by the GUI without a second terminal.
+
+### 1. `crates/jarvis-gui/tauri.conf.json` — add `externalBin`
+
+In the `bundle` section, add an `externalBin` entry pointing to the compiled backend:
+
+```json
+"bundle": {
+  "externalBin": [
+    "../../target/release/jarvis-app"
+  ],
+  "resources": {
+    "../../resources/commands": "resources/commands",
+    "../../resources/sound": "resources/sound",
+    "../../resources/rustpotter": "resources/rustpotter",
+    "../../resources/vosk": "resources/vosk",
+    "../../resources/keywords": "resources/keywords",
+    "../../lib/windows/amd64/*.dll": "."
+  }
+}
+```
+
+With this change, `cargo tauri build` will:
+1. Copy `jarvis-app.exe` into the installer package
+2. Extract it next to `jarvis-gui.exe` when the user installs the app
+3. Make it available for the GUI to spawn as a managed subprocess
+
+### 2. `crates/jarvis-gui/src/main.rs` (or `events.rs`) — auto-spawn the backend on startup
+
+After adding `externalBin`, the GUI Rust code needs to launch the backend automatically when the window opens. This requires `tauri-plugin-shell`. Add to the app initialization:
+
+```rust
+// In the Tauri setup closure:
+let _backend = app.shell()
+    .sidecar("jarvis-app")
+    .expect("jarvis-app sidecar not configured")
+    .spawn()
+    .expect("failed to spawn jarvis-app");
+```
+
+This spawns `jarvis-app` as a child process of the GUI — no second terminal needed for end users.
+
+### 3. `crates/jarvis-gui/Cargo.toml` — no change needed
+
+`jarvis-app` is a **binary crate**, not a library. It cannot be listed as a Cargo dependency and should not be. The two-process architecture is intentional — the processes communicate via IPC sockets defined in `jarvis-core`. The `Cargo.toml` is correct as-is.
+
+---
+
 ## Troubleshooting
 
 ### Build error: `linker error` or `libvosk not found`
@@ -448,12 +587,38 @@ cd crates/jarvis-gui
 cargo tauri dev
 ```
 
+### GUI opens but voice commands have no effect
+
+`jarvis-app.exe` (the voice engine) is not running. The GUI alone does not process voice input. Open a separate terminal and start the backend:
+
+```powershell
+# Development mode
+.\target\debug\jarvis-app.exe
+
+# Release mode
+.\target\release\jarvis-app.exe
+```
+
+Keep this terminal open alongside the GUI.
+
+### Backend exits immediately or crashes on startup
+
+Most likely causes:
+1. **Missing Vosk models** — `resources/vosk/` does not exist or is empty. Run `setup.ps1` or download models manually (see Step 5).
+2. **Missing DLLs** — run `cargo build -p jarvis-app` first (the `build.rs` copies DLLs automatically). Do not run `jarvis-app.exe` from a different folder.
+3. **Full log** — run with debug logging to see the exact error:
+   ```powershell
+   $env:RUST_LOG = "debug"
+   .\target\debug\jarvis-app.exe
+   ```
+
 ### Voice commands are not recognized
 
-1. Open **Windows Sound Settings** → set your microphone as the default recording device
-2. Verify models are in `resources/vosk/` with exact folder names (no extra nesting)
-3. Read the terminal output where you ran `cargo tauri dev` — errors are printed there
-4. Try running setup again: `powershell -ExecutionPolicy Bypass -File setup.ps1`
+1. Confirm `jarvis-app.exe` is running in a separate terminal (see above)
+2. Open **Windows Sound Settings** → set your microphone as the default recording device
+3. Verify models are in `resources/vosk/` with exact folder names (no extra nesting)
+4. Read the backend terminal output — STT errors are printed there
+5. Try running setup again: `powershell -ExecutionPolicy Bypass -File setup.ps1`
 
 ### First build is very slow (5–15 min)
 
@@ -484,21 +649,41 @@ cargo check --workspace
 # Run core library unit tests
 cargo test -p jarvis-core
 
-# Start app in development mode (hot reload)
+# Run Rust linter
+cargo clippy --workspace
+
+# --- Development mode (two terminals) ---
+
+# Terminal 1: build and start the backend
+cargo build -p jarvis-app
+.\target\debug\jarvis-app.exe
+
+# Terminal 2: start the GUI with hot reload
 cd crates/jarvis-gui
 cargo tauri dev
 
-# Build optimized release binary
-cargo tauri build
+# --- Release builds ---
 
-# Run Rust linter
-cargo clippy --workspace
+# Build the backend binary
+cargo build --release -p jarvis-app
+# Output: target/release/jarvis-app.exe
+
+# Build the Tauri installer
+cd crates/jarvis-gui
+cargo tauri build
+# Output: target/release/bundle/nsis/  and  target/release/bundle/msi/
 ```
 
-Enable verbose logging:
+Enable verbose logging for both processes:
 
 ```powershell
+# Terminal 1 — backend
 $env:RUST_LOG = "debug"
+.\target\debug\jarvis-app.exe
+
+# Terminal 2 — GUI
+$env:RUST_LOG = "debug"
+cd crates/jarvis-gui
 cargo tauri dev
 ```
 
