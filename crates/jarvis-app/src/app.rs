@@ -115,6 +115,33 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     ipc::send(IpcEvent::Listening);
                     recognize_command(&mut frame_buffer, &rt, frame_length, sample_rate, false);
 
+                    // ── ECHO DRAIN ──────────────────────────────────────────────────────────
+                    // Problem: audio::play_sound() (Kira backend) is NON-BLOCKING.
+                    // Response sounds (e.g. game_mode.wav) keep playing after execute_command()
+                    // returns. The microphone picks up speaker output → VAD triggers on echo
+                    // frames → Vosk receives non-speech audio → wake word recognition breaks.
+                    //
+                    // Also: execute_script() may block the thread (delay steps) for several
+                    // seconds. During that time nobody reads from PvRecorder, so its ring
+                    // buffer fills with stale/echo frames that must be discarded.
+                    //
+                    // Fix: drain mic frames until Kira reports playback is done, then drain
+                    // one extra second for reverb tail. Safety cap at 8 s to avoid blocking
+                    // indefinitely if is_playing() is stuck.
+                    {
+                        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
+                        while !should_stop() && audio::is_playing() && std::time::Instant::now() < deadline {
+                            recorder::read_microphone(&mut frame_buffer);
+                        }
+                        // Extra 1-second tail drain: clears residual reverb and any remaining
+                        // PvRecorder ring-buffer frames that accumulated while thread was blocked.
+                        let tail_frames = (1.0 * sample_rate as f32 / frame_length as f32) as usize;
+                        for _ in 0..tail_frames {
+                            recorder::read_microphone(&mut frame_buffer);
+                        }
+                    }
+                    // ── END ECHO DRAIN ──────────────────────────────────────────────────────
+
                     // reset state after command
                     vad_state = VadState::WaitingForVoice;
                     silence_frames = 0;

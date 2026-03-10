@@ -45,6 +45,12 @@ pub fn init() -> Result<(), ()> {
     }
 }
 
+/// Rodio calls play_sound() with sleep=true (blocking), so by the time
+/// execute_command() returns, audio is already done. Always false.
+pub fn is_playing() -> bool {
+    false
+}
+
 pub fn play_sound(filename: &PathBuf, sleep: bool) {
     // Load a sound from a file, using a path relative to Cargo.toml
     // let filepath = format!("{PUBLIC_PATH}/sound/{filename}.wav");
