@@ -82,8 +82,9 @@ pub fn list_scripts() -> Vec<Script> {
 }
 
 /// Create or update a script (identified by script.id).
+/// Pass `old_id` when renaming so the old file gets deleted after the new one is written.
 #[tauri::command]
-pub fn save_script(script: Script) -> Result<(), String> {
+pub fn save_script(script: Script, old_id: Option<String>) -> Result<(), String> {
     validate_script_id(&script.id)?;
     fs::create_dir_all(scripts_dir())
         .map_err(|e| format!("Cannot create scripts dir: {}", e))?;
@@ -92,7 +93,20 @@ pub fn save_script(script: Script) -> Result<(), String> {
         .map_err(|e| format!("Cannot serialize script: {}", e))?;
 
     fs::write(script_path(&script.id), content)
-        .map_err(|e| format!("Cannot write script: {}", e))
+        .map_err(|e| format!("Cannot write script: {}", e))?;
+
+    // Delete the old file if the ID was renamed
+    if let Some(old) = old_id {
+        if old != script.id {
+            let old_path = script_path(&old);
+            if old_path.exists() {
+                fs::remove_file(&old_path)
+                    .map_err(|e| format!("Cannot delete old script '{}': {}", old, e))?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Remove a script file.

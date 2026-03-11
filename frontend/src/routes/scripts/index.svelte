@@ -84,6 +84,7 @@
     }
 
     let idTouched = false
+    let originalId: string | undefined = undefined
     let form: Form = emptyForm()
 
     function emptyForm(): Form {
@@ -145,6 +146,7 @@
         try {
             await invoke("delete_script", { scriptId: id })
             await loadAll()
+            invoke("reload_jarvis_commands").catch(() => {/* jarvis-app may not be running */})
         } catch (e) {
             globalError = String(e)
         }
@@ -183,12 +185,16 @@
 
         saving = true
         try {
-            await invoke("save_script", { script: payload })
+            await invoke("save_script", {
+                script: payload,
+                oldId: modalMode === "edit" ? originalId : undefined,
+            })
             flash(modalMode === "edit"
                 ? `Script "${payload.name}" updated`
                 : `Script "${payload.name}" created`)
             closeModal()
             await loadAll()
+            invoke("reload_jarvis_commands").catch(() => {/* jarvis-app may not be running */})
         } catch (e) {
             form.formError = String(e)
         }
@@ -206,6 +212,7 @@
 
     function openEditModal(s: Script) {
         modalMode = "edit"
+        originalId = s.id
         idTouched = true
         form = {
             id: s.id,
@@ -236,6 +243,7 @@
         showModal = false
         form = emptyForm()
         idTouched = false
+        originalId = undefined
     }
 
     function addStep() {

@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use serde::{Serialize, Deserialize};
 use parking_lot::RwLock;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JCommandsList {
     #[serde(skip)]
     pub path: PathBuf,

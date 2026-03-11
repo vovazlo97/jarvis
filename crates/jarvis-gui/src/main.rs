@@ -77,6 +77,7 @@ fn main() {
             tauri_commands::get_jarvis_app_stats,
             tauri_commands::is_jarvis_app_running,
             tauri_commands::run_jarvis_app,
+            tauri_commands::reload_jarvis_commands,
 
             // vosk
             tauri_commands::list_vosk_models,

@@ -89,8 +89,8 @@ pub fn create_command_pack(pack_name: String, command: NewCommandInput) -> Resul
         .map_err(|e| format!("Cannot create directory '{}': {}", safe, e))?;
 
     let toml_path = pack_path.join("command.toml");
-    fs::write(&toml_path, build_toml(&command))
-        .map_err(|e| format!("Cannot write command.toml: {}", e))
+    let cmd = input_to_jcommand(&command)?;
+    save_commands(&[cmd], &toml_path)
 }
 
 /// Append a command to an existing pack without touching other commands.
@@ -207,78 +207,17 @@ fn input_to_jcommand(input: &NewCommandInput) -> Result<JCommand, String> {
         .ok_or_else(|| "Empty command list after build".to_string())
 }
 
-/// Write all commands back to a TOML file, preserving a readable format.
+/// Write all commands back to a TOML file using serde serialization.
+/// This guarantees the file always round-trips correctly with toml::from_str.
 fn save_commands(commands: &[JCommand], path: &Path) -> Result<(), String> {
-    let content = commands.iter()
-        .map(cmd_to_toml_block)
-        .collect::<Vec<_>>()
-        .join("\n\n");
-    fs::write(path, content + "\n")
+    let list = JCommandsList {
+        path: std::path::PathBuf::new(),
+        commands: commands.to_vec(),
+    };
+    let content = toml::to_string_pretty(&list)
+        .map_err(|e| format!("Cannot serialize commands: {}", e))?;
+    fs::write(path, content)
         .map_err(|e| format!("Cannot write TOML: {}", e))
-}
-
-/// Convert a JCommand back to a readable [[commands]] TOML block.
-fn cmd_to_toml_block(cmd: &JCommand) -> String {
-    fn esc(s: &str) -> String { format!("{:?}", s) }
-    fn esc_arr(v: &[String]) -> String {
-        format!("[{}]", v.iter().map(|s| format!("{:?}", s)).collect::<Vec<_>>().join(", "))
-    }
-
-    let mut lines = vec![
-        "[[commands]]".to_string(),
-        format!("id = {}", esc(&cmd.id)),
-        format!("type = {}", esc(&cmd.cmd_type)),
-    ];
-
-    if !cmd.description.is_empty() {
-        lines.push(format!("description = {}", esc(&cmd.description)));
-    }
-    if !cmd.exe_path.is_empty() {
-        lines.push(format!("exe_path = {}", esc(&cmd.exe_path)));
-        lines.push(format!("exe_args = {}", esc_arr(&cmd.exe_args)));
-    }
-    if !cmd.cli_cmd.is_empty() {
-        lines.push(format!("cli_cmd = {}", esc(&cmd.cli_cmd)));
-        if !cmd.cli_args.is_empty() {
-            lines.push(format!("cli_args = {}", esc_arr(&cmd.cli_args)));
-        }
-    }
-    if !cmd.script.is_empty() {
-        lines.push(format!("script = {}", esc(&cmd.script)));
-    }
-    if cmd.timeout > 0 {
-        lines.push(format!("timeout = {}", cmd.timeout));
-    }
-    if !cmd.sandbox.is_empty() {
-        lines.push(format!("sandbox = {}", esc(&cmd.sandbox)));
-    }
-
-    // Sounds — sort langs for determinism
-    let mut sound_langs: Vec<&String> = cmd.sounds.keys().collect();
-    sound_langs.sort();
-    for lang in sound_langs {
-        if let Some(v) = cmd.sounds.get(lang) {
-            lines.push(format!("sounds.{} = {}", lang, esc_arr(v)));
-        }
-    }
-
-    // Phrases — sort langs for determinism
-    let mut phrase_langs: Vec<&String> = cmd.phrases.keys().collect();
-    phrase_langs.sort();
-    for lang in phrase_langs {
-        if let Some(v) = cmd.phrases.get(lang) {
-            lines.push(format!("phrases.{} = {}", lang, esc_arr(v)));
-        }
-    }
-
-    if !cmd.patterns.is_empty() {
-        lines.push(format!("patterns = {}", esc_arr(&cmd.patterns)));
-    }
-    if !cmd.response_sound.is_empty() {
-        lines.push(format!("response_sound = {}", esc(&cmd.response_sound)));
-    }
-
-    lines.join("\n")
 }
 
 /// Build a fresh [[commands]] TOML block from user input.

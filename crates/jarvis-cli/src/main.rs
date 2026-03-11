@@ -121,11 +121,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Vec::new()
         }
     };
-    COMMANDS_LIST.set(cmds).expect("Failed to set commands list");
-    
+    *COMMANDS_LIST.write() = cmds;
+
     // init intent classifier
     println!("[*] Initializing intent classifier...");
-    match intent::init(COMMANDS_LIST.get().unwrap()).await {
+    let cmds_for_intent = COMMANDS_LIST.read().to_vec();
+    match intent::init(&cmds_for_intent).await {
         Ok(_) => println!("    Intent classifier ready"),
         Err(e) => println!("    Warning: {}", e),
     }
@@ -162,10 +163,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
             "help" | "h" | "?" => print_help(),
-            "list" | "ls" => list_commands(COMMANDS_LIST.get().unwrap()),
-            "phrases" => list_phrases(COMMANDS_LIST.get().unwrap()),
+            "list" | "ls" => list_commands(&COMMANDS_LIST.read()),
+            "phrases" => list_phrases(&COMMANDS_LIST.read()),
             "hash" => {
-                let hash = commands::commands_hash(COMMANDS_LIST.get().unwrap());
+                let hash = commands::commands_hash(&COMMANDS_LIST.read());
                 println!("  Commands hash: {}", hash);
             }
             "settings" => {
@@ -186,7 +187,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if arg.is_empty() {
                     println!("  Usage: execute <text>");
                 } else {
-                    execute_text(COMMANDS_LIST.get().unwrap(), arg).await;
+                    execute_text(&COMMANDS_LIST.read(), arg).await;
                 }
             }
             "reload" => {

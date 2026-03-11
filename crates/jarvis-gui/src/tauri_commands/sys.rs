@@ -124,29 +124,51 @@ pub fn get_peak_ram_usage() -> String {
     format!("{}", PEAK_ALLOC.peak_usage_as_gb())
 }
 
+/// Send ReloadCommands IPC action to a running jarvis-app instance.
+/// Called by the GUI after any command/script CRUD operation.
+#[tauri::command]
+pub async fn reload_jarvis_commands() -> Result<(), String> {
+    use tokio_tungstenite::connect_async;
+    use futures_util::SinkExt;
+    use tokio_tungstenite::tungstenite::Message;
+
+    let url = "ws://127.0.0.1:9712";
+    let (mut ws, _) = connect_async(url).await
+        .map_err(|e| format!("Cannot connect to jarvis-app (is it running?): {}", e))?;
+    ws.send(Message::Text(r#"{"action":"reload_commands"}"#.to_string().into())).await
+        .map_err(|e| format!("Cannot send reload command: {}", e))?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn run_jarvis_app() -> Result<(), String> {
+    // Guard against spawning a duplicate process — check if IPC port is already bound.
+    if std::net::TcpStream::connect("127.0.0.1:9712").is_ok() {
+        log::info!("jarvis-app already running (port 9712 is open), skipping spawn");
+        return Ok(());
+    }
+
     let exe_dir = std::env::current_exe()
         .map_err(|e| format!("Failed to get exe path: {}", e))?
         .parent()
         .ok_or("Failed to get exe directory")?
         .to_path_buf();
-    
+
     #[cfg(target_os = "windows")]
     let jarvis_app_name = "jarvis-app.exe";
-    
+
     #[cfg(not(target_os = "windows"))]
     let jarvis_app_name = "jarvis-app";
-    
+
     let jarvis_app_path = exe_dir.join(jarvis_app_name);
-    
+
     if !jarvis_app_path.exists() {
         return Err(format!("jarvis-app not found at: {}", jarvis_app_path.display()));
     }
-    
+
     std::process::Command::new(&jarvis_app_path)
         .spawn()
         .map_err(|e| format!("Failed to start jarvis-app: {}", e))?;
-    
+
     Ok(())
 }

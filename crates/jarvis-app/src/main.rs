@@ -98,7 +98,7 @@ fn main() -> Result<(), String> {
     let script_count = scripts::parse_scripts().len();
     info!("Scripts found on disk: {} (matched live, not pre-registered)", script_count);
 
-    COMMANDS_LIST.set(cmds).unwrap();
+    *COMMANDS_LIST.write() = cmds;
 
     // init audio
     if audio::init().is_err() {
@@ -118,8 +118,9 @@ fn main() -> Result<(), String> {
     );
 
     // init intent-recognition engine
+    let cmds_for_intent = COMMANDS_LIST.read().to_vec();
     rt.block_on(async {
-        if let Err(e) = intent::init(COMMANDS_LIST.get().unwrap()).await {
+        if let Err(e) = intent::init(&cmds_for_intent).await {
             error!("Failed to initialize intent classifier: {}", e);
             app::close(1);
         }
@@ -141,6 +142,7 @@ fn main() -> Result<(), String> {
     // channel for text commands (manually written in the GUI)
     let (text_cmd_tx, text_cmd_rx) = mpsc::channel::<String>();
 
+    let rt_for_reload = Arc::clone(&rt);
     ipc::set_action_handler(move |action| {
         match action {
             IpcAction::Stop => {
@@ -148,8 +150,25 @@ fn main() -> Result<(), String> {
                 SHOULD_STOP.store(true, Ordering::SeqCst);
             }
             IpcAction::ReloadCommands => {
-                info!("Received reload commands request");
-                // TODO: implement reload
+                info!("Received reload commands request — reloading from disk");
+                match commands::parse_commands() {
+                    Ok(new_cmds) => {
+                        *COMMANDS_LIST.write() = new_cmds;
+                        info!("Commands reloaded successfully");
+                        // Retrain intent classifier in background so new voice phrases work.
+                        // Audio pipeline (wake word, STT, recorder) is NOT touched.
+                        let cmds_snapshot = COMMANDS_LIST.read().to_vec();
+                        let reload_rt = Arc::clone(&rt_for_reload);
+                        std::thread::spawn(move || {
+                            if let Err(e) = reload_rt.block_on(intent::reinit(&cmds_snapshot)) {
+                                error!("Intent classifier reload failed: {}", e);
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        error!("Failed to reload commands: {}", e);
+                    }
+                }
             }
             IpcAction::SetMuted { muted } => {
                 info!("Received mute request: {}", muted);

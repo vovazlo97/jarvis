@@ -243,10 +243,8 @@ fn exec_step(step: &ScriptStep) -> Result<(), String> {
 
 fn exec_command_ref(step: &ScriptStep) -> Result<(), String> {
     // Look up the command in the already-loaded COMMANDS_LIST
-    let cmds_list = match crate::COMMANDS_LIST.get() {
-        Some(c) => c,
-        None => return Err("Commands not loaded".into()),
-    };
+    let cmds_guard = crate::COMMANDS_LIST.read();
+    let cmds_list = &*cmds_guard;
 
     for cmd_list in cmds_list {
         let pack_name = cmd_list.path.file_name()
