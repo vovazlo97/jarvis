@@ -1,7 +1,7 @@
 use std::sync::mpsc::Receiver;
 use std::time::SystemTime;
 
-use jarvis_core::{audio, audio_buffer::AudioRingBuffer, audio_processing, commands, scripts, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots, SOUND_DIR};
+use jarvis_core::{audio, audio_buffer::AudioRingBuffer, audio_processing, commands, scripts, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots, SOUND_DIR, AssistantState};
 use rand::seq::SliceRandom;
 
 use crate::should_stop;
@@ -48,6 +48,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
     }
 
     ipc::send(IpcEvent::Idle);
+    ipc::send(IpcEvent::StateChanged { state: AssistantState::Idle });
 
     // ### WAKE WORD DETECTION LOOP
     let mut audio_chunk_count: u64 = 0;
@@ -102,6 +103,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     // WAKE WORD DETECTED!
                     info!("Wake word activated!");
                     ipc::send(IpcEvent::WakeWordDetected);
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Activated });
 
                     stt::reset_wake_recognizer();
                     // Reset speech recognizer so it starts fresh for the upcoming command
@@ -113,6 +115,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     voices::play_reply();
 
                     ipc::send(IpcEvent::Listening);
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Listening });
                     recognize_command(&mut frame_buffer, &rt, frame_length, sample_rate, false);
 
                     // Drain speaker echo before re-entering wake word detection.
@@ -127,7 +130,8 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     stt::reset_speech_recognizer(); // NOW reset, after command is done
                     audio_processing::reset();
                     ipc::send(IpcEvent::Idle);
-                    
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Idle });
+
                     continue 'wake_word;
                 }
                 
@@ -215,7 +219,8 @@ fn recognize_command(
                     ipc::send(IpcEvent::SpeechRecognized {
                         text: recognized_voice.clone(),
                     });
-                    
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Processing });
+
                     recognized_voice = recognized_voice.to_lowercase();
                     
                     // check if wake word repeated (reactivate)
@@ -249,7 +254,8 @@ fn recognize_command(
                             voices::play_reply();
                             stt::reset_speech_recognizer();
                             ipc::send(IpcEvent::Listening);
-                            
+                            ipc::send(IpcEvent::StateChanged { state: AssistantState::Listening });
+
                             vad_state = VadState::WaitingForVoice;
                             silence_frames = 0;
                             start = SystemTime::now();
@@ -301,6 +307,7 @@ fn recognize_command(
                         start = SystemTime::now();
                         audio_buffer.clear();
                         ipc::send(IpcEvent::Listening);
+                        ipc::send(IpcEvent::StateChanged { state: AssistantState::Listening });
                         continue;
                     } else {
                         // no chain: pre-reset Vosk so buffer doesn't carry over
@@ -406,6 +413,10 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
         commands::fetch_command(text, commands_list)
     };
     
+    // Intent classification complete — now entering Responding phase.
+    // Emitted once regardless of which branch handles the command (found, script, not-found).
+    ipc::send(IpcEvent::StateChanged { state: AssistantState::Responding });
+
     if let Some((cmd_path, cmd_config)) = cmd_result {
         info!("Command found: {:?}", cmd_path);
 
