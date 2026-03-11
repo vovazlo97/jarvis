@@ -47,6 +47,9 @@ pub mod audio_buffer;
 
 pub mod scripts;
 
+pub mod state;
+pub use state::AssistantState;
+
 #[cfg(feature = "lua")]
 pub mod lua;
 
