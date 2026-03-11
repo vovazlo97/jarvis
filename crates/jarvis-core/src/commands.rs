@@ -252,7 +252,7 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
     match cmd_config.cmd_type.as_str() {
 
         // BRUH
-        "voice" => Ok(true),
+        "voice" => Ok(cmd_config.allow_chaining),
         
         // LUA command
         #[cfg(feature = "lua")]
@@ -282,7 +282,7 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
                 .args(&cmd_config.exe_args)
                 .current_dir(&work_dir)
                 .spawn()
-                .map(|_| true)
+                .map(|_| cmd_config.allow_chaining)
                 .map_err(|e| format!("Exe spawn error: {}", e))
         }
 
@@ -293,7 +293,7 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
             let url_opt = if url.is_empty() { None } else { Some(url) };
             info!("Opening URL via Chrome: {:?}", url_opt);
             launch_browser(url_opt)
-                .map(|_| true)
+                .map(|_| cmd_config.allow_chaining)
                 .map_err(|e| format!("Browser launch error: {}", e))
         }
 
@@ -301,7 +301,7 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
         "cli" => {
             info!("CLI: {} {:?}", cmd_config.cli_cmd, cmd_config.cli_args);
             execute_cli(&cmd_config.cli_cmd, &cmd_config.cli_args)
-                .map(|_| true)
+                .map(|_| cmd_config.allow_chaining)
                 .map_err(|e| format!("CLI command error: {}", e))
         }
         
@@ -462,9 +462,32 @@ mod tests {
     }
 
     #[test]
-    fn test_voice_cmd_returns_true() {
+    fn test_voice_cmd_returns_false_by_default() {
         let cmd = cmd_from_toml("id = \"noop\"\ntype = \"voice\"\n");
+        assert_eq!(execute_command(&PathBuf::from("/t"), &cmd, None, None), Ok(false));
+    }
+
+    #[test]
+    fn test_voice_cmd_with_allow_chaining_returns_true() {
+        let cmd = cmd_from_toml("id = \"noop\"\ntype = \"voice\"\nallow_chaining = true\n");
         assert_eq!(execute_command(&PathBuf::from("/t"), &cmd, None, None), Ok(true));
+    }
+
+    #[test]
+    fn test_allow_chaining_default_is_false() {
+        for t in &["voice", "exe", "url", "cli"] {
+            let toml = format!("id = \"x\"\ntype = \"{}\"\n", t);
+            let cmd: JCommand = toml::from_str(&toml).unwrap();
+            assert!(!cmd.allow_chaining, "type={} should default to no chaining", t);
+        }
+    }
+
+    #[test]
+    fn test_allow_chaining_opt_in() {
+        let cmd: JCommand = toml::from_str(
+            "id = \"x\"\ntype = \"voice\"\nallow_chaining = true\n"
+        ).unwrap();
+        assert!(cmd.allow_chaining);
     }
 
     #[test]
