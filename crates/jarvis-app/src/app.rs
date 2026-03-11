@@ -98,7 +98,10 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                 // dual-feed: speech recognizer gets frames in parallel with wake word detector
                 let _ = stt::recognize(&frame_buffer, false);
 
-                // feed to wake word detector
+                // Wake-word detection is ONLY active here, in the outer 'wake_word loop
+                // (AssistantState::Idle). Once recognize_command() is called the outer
+                // loop is suspended entirely — the inner loop never calls data_callback(),
+                // so the detector cannot fire during command execution or chaining.
                 if let Some(_keyword_index) = listener::data_callback(&frame_buffer) {
                     // WAKE WORD DETECTED!
                     info!("Wake word activated!");
@@ -536,4 +539,19 @@ pub fn close(code: i32) {
     voices::play_goodbye();
     ipc::send(IpcEvent::Stopping);
     std::process::exit(code);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression: execute_command must return false (no chain) when COMMANDS_LIST is
+    /// not yet initialised — i.e. the assistant must return to Idle, never stay in
+    /// Listening, regardless of what text was spoken.
+    #[test]
+    fn test_execute_command_returns_false_when_no_commands_loaded() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = execute_command("запусти ведьмака", &rt);
+        assert!(!result, "execute_command must return false (no chain) when commands list is empty");
+    }
 }
