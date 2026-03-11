@@ -157,7 +157,7 @@ impl LuaEngine {
         match value {
             // return { chain = false }
             Value::Table(t) => {
-                let chain = t.get::<bool>("chain").unwrap_or(true);
+                let chain = t.get::<bool>("chain").unwrap_or(false);
                 CommandResult { chain }
             }
             // return false (shorthand for no chain)
