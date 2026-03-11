@@ -209,7 +209,24 @@ fn main_loop(text_cmd_rx: Receiver<String>) -> Result<(), ()> {
                         // execute command (shared executor)
                         execute_command(&recognized_voice, &rt);
 
-                        // return to wake-word listening after command execution (no matter successful or not)
+                        // Reset audio state after command execution.
+                        // Reason: play_ok() is blocking; PvRecorder buffers stale mic frames
+                        // (acoustic echo of the ok sound) while blocked. Without reset+drain,
+                        // GainNormalizer adapts down from those stale frames, reducing wake word sensitivity.
+                        audio_processing::reset();
+                        stt::reset_wake_recognizer();
+                        stt::reset_speech_recognizer();
+
+                        // Drain stale frames from PvRecorder ring buffer (~500 ms).
+                        // This flushes buffered echo before re-entering wake-word detection.
+                        {
+                            let drain_count = (0.5 * sample_rate as f32 / frame_length as f32) as usize;
+                            for _ in 0..drain_count {
+                                recorder::read_microphone(&mut frame_buffer);
+                            }
+                        }
+
+                        // return to wake-word listening after command execution
                         break 'voice_recognition;
                     }
 

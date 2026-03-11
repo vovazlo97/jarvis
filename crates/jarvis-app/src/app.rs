@@ -1,7 +1,7 @@
 use std::sync::mpsc::Receiver;
 use std::time::SystemTime;
 
-use jarvis_core::{audio, audio_buffer::AudioRingBuffer, audio_processing, commands, scripts, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots, SOUND_DIR};
+use jarvis_core::{audio, audio_buffer::AudioRingBuffer, audio_processing, commands, scripts, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots, SOUND_DIR, AssistantState};
 use rand::seq::SliceRandom;
 
 use crate::should_stop;
@@ -48,6 +48,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
     }
 
     ipc::send(IpcEvent::Idle);
+    ipc::send(IpcEvent::StateChanged { state: AssistantState::Idle });
 
     // ### WAKE WORD DETECTION LOOP
     let mut audio_chunk_count: u64 = 0;
@@ -97,11 +98,15 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                 // dual-feed: speech recognizer gets frames in parallel with wake word detector
                 let _ = stt::recognize(&frame_buffer, false);
 
-                // feed to wake word detector
+                // Wake-word detection is ONLY active here, in the outer 'wake_word loop
+                // (AssistantState::Idle). Once recognize_command() is called the outer
+                // loop is suspended entirely — the inner loop never calls data_callback(),
+                // so the detector cannot fire during command execution or chaining.
                 if let Some(_keyword_index) = listener::data_callback(&frame_buffer) {
                     // WAKE WORD DETECTED!
                     info!("Wake word activated!");
                     ipc::send(IpcEvent::WakeWordDetected);
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Activated });
 
                     stt::reset_wake_recognizer();
                     // Reset speech recognizer so it starts fresh for the upcoming command
@@ -113,7 +118,12 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     voices::play_reply();
 
                     ipc::send(IpcEvent::Listening);
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Listening });
                     recognize_command(&mut frame_buffer, &rt, frame_length, sample_rate, false);
+
+                    // Drain speaker echo before re-entering wake word detection.
+                    // (Kira is non-blocking; response sounds keep playing after return.)
+                    drain_echo(&mut frame_buffer, sample_rate, frame_length, 8);
 
                     // reset state after command
                     vad_state = VadState::WaitingForVoice;
@@ -123,7 +133,8 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     stt::reset_speech_recognizer(); // NOW reset, after command is done
                     audio_processing::reset();
                     ipc::send(IpcEvent::Idle);
-                    
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Idle });
+
                     continue 'wake_word;
                 }
                 
@@ -211,7 +222,8 @@ fn recognize_command(
                     ipc::send(IpcEvent::SpeechRecognized {
                         text: recognized_voice.clone(),
                     });
-                    
+                    ipc::send(IpcEvent::StateChanged { state: AssistantState::Processing });
+
                     recognized_voice = recognized_voice.to_lowercase();
                     
                     // check if wake word repeated (reactivate)
@@ -245,7 +257,8 @@ fn recognize_command(
                             voices::play_reply();
                             stt::reset_speech_recognizer();
                             ipc::send(IpcEvent::Listening);
-                            
+                            ipc::send(IpcEvent::StateChanged { state: AssistantState::Listening });
+
                             vad_state = VadState::WaitingForVoice;
                             silence_frames = 0;
                             start = SystemTime::now();
@@ -284,18 +297,26 @@ fn recognize_command(
                     let should_chain = execute_command(&recognized_voice, rt);
                     
                     if should_chain {
-                        // chain: reset and continue listening
+                        // chain: drain echo FIRST, then reset and continue listening.
+                        // Without the drain the ok-sound echo triggers VAD → VoiceActive
+                        // → Vosk accumulates garbage for up to 5 s (silence_threshold) → deafness.
                         info!("Chaining enabled, continuing to listen...");
+                        debug!("[DEBUG] Resetting Audio Stream for Chaining");
+                        drain_echo(frame_buffer, sample_rate, frame_length, 5);
                         stt::reset_speech_recognizer();
+                        audio_processing::reset();
                         vad_state = VadState::WaitingForVoice;
                         silence_frames = 0;
                         start = SystemTime::now();
                         audio_buffer.clear();
                         ipc::send(IpcEvent::Listening);
+                        ipc::send(IpcEvent::StateChanged { state: AssistantState::Listening });
                         continue;
                     } else {
-                        // no chain: return to wake word
+                        // no chain: pre-reset Vosk so buffer doesn't carry over
+                        // into the echo drain + full reset that runs in main_loop.
                         info!("No chain, returning to wake word mode.");
+                        stt::reset_speech_recognizer();
                         return;
                     }
                 }
@@ -324,6 +345,30 @@ fn recognize_command(
     }
 }
 
+
+/// Drain microphone frames while Kira audio is playing, then add a dead zone
+/// and a reverb tail drain. Call this after ANY audio playback + execute_command
+/// to prevent speaker echo from reaching Vosk or the wake word detector.
+///
+/// - Reads and discards frames until audio::is_playing() returns false
+/// - Adds 300 ms dead zone (flushes audio-card output buffer residue from PvRecorder)
+/// - Adds 1 s reverb tail (clears remaining ring-buffer frames)
+/// - Safety cap: never blocks longer than `max_secs` seconds total
+fn drain_echo(frame_buffer: &mut [i16], sample_rate: usize, frame_length: usize, max_secs: u64) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(max_secs);
+    let mut n: usize = 0;
+    while !crate::should_stop() && audio::is_playing() && std::time::Instant::now() < deadline {
+        recorder::read_microphone(frame_buffer);
+        n += 1;
+    }
+    // 300 ms dead zone + 1 s reverb tail: discard audio-card / PvRecorder residue
+    let extra = ((0.3 + 1.0) * sample_rate as f32 / frame_length as f32) as usize;
+    for _ in 0..extra {
+        recorder::read_microphone(frame_buffer);
+    }
+    debug!("[EchoDrain] drained {} playback + {} tail = {} frames total",
+        n, extra, n + extra);
+}
 
 fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
     info!("Processing text command: {}", text);
@@ -371,6 +416,10 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
         commands::fetch_command(text, commands_list)
     };
     
+    // Intent classification complete — now entering Responding phase.
+    // Emitted once regardless of which branch handles the command (found, script, not-found).
+    ipc::send(IpcEvent::StateChanged { state: AssistantState::Responding });
+
     if let Some((cmd_path, cmd_config)) = cmd_result {
         info!("Command found: {:?}", cmd_path);
 
@@ -472,11 +521,14 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
         // ("Чего вы пытаетесь добиться, сэр?" — see resources/sound/jarvis-remaster/)
         info!("No command found for: '{}'", text);
         voices::play_not_found();
+        // Reset speech recognizer immediately: prevents the not-found sound echo from
+        // being fed into an already-full Vosk buffer on the next recognition pass.
+        stt::reset_speech_recognizer();
         ipc::send(IpcEvent::Error {
             message: format!("Command not found: {}", text)
         });
     }
-    
+
     ipc::send(IpcEvent::Idle);
     false // no chain on error or not found
 }
@@ -487,4 +539,19 @@ pub fn close(code: i32) {
     voices::play_goodbye();
     ipc::send(IpcEvent::Stopping);
     std::process::exit(code);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression: execute_command must return false (no chain) when COMMANDS_LIST is
+    /// not yet initialised — i.e. the assistant must return to Idle, never stay in
+    /// Listening, regardless of what text was spoken.
+    #[test]
+    fn test_execute_command_returns_false_when_no_commands_loaded() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = execute_command("запусти ведьмака", &rt);
+        assert!(!result, "execute_command must return false (no chain) when commands list is empty");
+    }
 }

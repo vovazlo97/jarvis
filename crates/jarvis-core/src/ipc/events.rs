@@ -33,6 +33,11 @@ pub enum IpcEvent {
 
     // request GUI to reveal/focus window
     RevealWindow,
+
+    /// High-level assistant state transition.
+    /// Lifecycle: Idle → Activated → Listening → Processing → Responding → Idle
+    /// Responding → Listening only when allow_chaining = true.
+    StateChanged { state: crate::state::AssistantState },
 }
 
 // Actions sent from GUI to jarvis-app

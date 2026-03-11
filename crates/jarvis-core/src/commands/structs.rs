@@ -71,6 +71,11 @@ pub struct JCommand {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub response_sound: String,
 
+    /// If true, Jarvis stays in LISTENING mode after this command executes.
+    /// Default: false — returns to IDLE (wake-word mode) after execution.
+    #[serde(default)]
+    pub allow_chaining: bool,
+
     // CACHE
     #[serde(skip, default)]
     sounds_cache: RwLock<HashMap<String, Arc<Vec<String>>>>,
@@ -104,6 +109,7 @@ impl Clone for JCommand {
 
             slots: self.slots.clone(),
             response_sound: self.response_sound.clone(),
+            allow_chaining: self.allow_chaining,
 
             // empty caches for cloned instance
             sounds_cache: RwLock::new(HashMap::new()),
@@ -171,6 +177,7 @@ impl JCommand {
             patterns: Vec::new(),
             slots: std::collections::HashMap::new(),
             response_sound: String::new(),
+            allow_chaining: false,
             sounds_cache: Default::default(),
             phrases_cache: Default::default(),
         }

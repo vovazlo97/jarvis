@@ -1,6 +1,5 @@
 use jarvis_core::recorder;
 // use rodio::{Decoder, OutputStream, Sink};
-use std::path::PathBuf;
 use jarvis_core::audio;
 
 #[tauri::command]
@@ -15,6 +14,6 @@ pub fn pv_get_audio_device_name(idx: i32) -> String {
 
 #[tauri::command(async)]
 pub fn play_sound(filename: &str) {
-    let path = PathBuf::from(filename);
+    let path = jarvis_core::SOUND_DIR.join(filename);
     audio::play_sound(&path);
 }

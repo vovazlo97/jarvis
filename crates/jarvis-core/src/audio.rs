@@ -55,6 +55,16 @@ pub fn init() -> Result<(), ()> {
     Ok(())
 }
 
+/// Returns true if audio is currently playing in the background.
+/// Kira is non-blocking; call this to check if playback is still in progress
+/// before re-entering wake word detection, to avoid microphone echo contamination.
+pub fn is_playing() -> bool {
+    match AUDIO_TYPE.get() {
+        Some(AudioType::Kira) => kira::is_playing(),
+        _ => false, // Rodio blocks, so always done by return
+    }
+}
+
 pub fn play_sound(filename: &PathBuf) {
     let audio_type = match AUDIO_TYPE.get() {
         Some(t) => t,

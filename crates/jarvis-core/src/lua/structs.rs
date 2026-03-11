@@ -30,6 +30,6 @@ pub struct CommandResult {
 
 impl Default for CommandResult {
     fn default() -> Self {
-        Self { chain: true }
+        Self { chain: false }
     }
 }
