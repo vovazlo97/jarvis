@@ -21,42 +21,29 @@ A privacy-first voice assistant built with Rust and Tauri. Speak a command — J
 | **Custom voice responses** | Assign specific audio responses per command or script |
 | **Sound Manager** | Browse, import and preview voice pack sounds from Settings |
 
-**Example use case:** Say *"work mode"* → JARVIS opens Chrome with YouTube, waits 2 seconds, then starts your Spotify playlist — all configured through the GUI, no code needed.
+**Example:** Say *"work mode"* → JARVIS opens Chrome with YouTube, waits 2 seconds, then starts your Spotify playlist — all configured through the GUI, no code needed.
 
 ---
 
 ## Commands & Scripts Visual Guide
 
-Below is an overview of the key features added in this fork, illustrated with the new interface elements.
-
-### 1. Command Editor
-
-A **Command** is a single action triggered by a specific voice phrase. You can now manage them entirely through the GUI.
+### Command Editor
 
 ![JARVIS Command Editor](CommandEditor.jpg)
 
-* **Action Types**: Supports launching applications (`EXE APP`), opening URLs (`CHROME / URL`), terminal commands (`CLI / POWERSHELL`), and voice-only intents (`VOICE ONLY`).
-* **Multi-language Support**: Define different trigger phrases for various languages (e.g., English and Russian) within the same command.
-* **Response Sound**: Assign a specific audio response that plays when this command is triggered (overrides the default voice pack).
+Manage single voice-triggered actions entirely through the GUI. Supports `EXE APP`, `CHROME / URL`, `CLI / POWERSHELL`, and `VOICE ONLY` action types with per-language trigger phrases and custom response sounds.
 
-### 2. Script Editor & Step Builder
-
-A **Script** allows you to automate a **multi-step workflow**. It is a powerful tool for creating complex automation scenarios.
+### Script Editor & Step Builder
 
 ![JARVIS Script Editor](ScriptEditor.jpg)
 
-* **Execution Mode**: Run steps one by one (`Sequential`) or all at once (`Parallel`).
-* **Visual Step Builder**: Add actions via the "+ Add Step" button. Supports delays, cross-command references, Spotify controls, and custom Shell scripts.
+Automate multi-step workflows. Run steps one by one (`Sequential`) or all at once (`Parallel`). Add delays, cross-command references, Spotify controls, and custom shell scripts via the visual builder.
 
-### 3. Sound Manager
-
-A new dedicated section in Settings to manage all of the assistant's audio feedback.
+### Sound Manager
 
 ![JARVIS Sound Manager](SoundManager.jpg)
 
-* **Browse & Preview**: View all available files in the current voice pack with instant playback for testing.
-* **Import Sounds**: The "+ Добавить звук" button allows you to quickly import your own WAV files into the project.
-* **Categories**: Easy filtering of sounds by category (e.g., `custom`, `system`).
+Manage all audio feedback from Settings — browse, preview, import WAV files, and filter sounds by category.
 
 ---
 
@@ -78,15 +65,15 @@ A new dedicated section in Settings to manage all of the assistant's audio feedb
 
 ## System Prerequisites (Windows)
 
-Before installing Rust, install the **Microsoft C++ Build Tools** — required by Rust's MSVC toolchain to compile native dependencies (Vosk, audio libraries):
+Before installing Rust, install the **Microsoft C++ Build Tools** — required by Rust's MSVC toolchain:
 
-1. Download the installer from [https://visualstudio.microsoft.com/visual-cpp-build-tools/](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-2. In the Visual Studio Installer, select the **"Desktop development with C++"** workload
-3. Click **Install** and wait for it to complete (~5–8 GB)
+1. Download from [https://visualstudio.microsoft.com/visual-cpp-build-tools/](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. Select the **"Desktop development with C++"** workload
+3. Click **Install** (~5–8 GB)
 
-> If you already have **Visual Studio 2019/2022** with the C++ workload installed, skip this step.
+> Skip this step if you already have **Visual Studio 2019/2022** with the C++ workload.
 
-Without the C++ Build Tools, `cargo build -p jarvis-app` will fail with a linker error even if `libvosk.lib` is present in the repository.
+Without the C++ Build Tools, `cargo build -p jarvis-app` will fail with a linker error.
 
 ---
 
@@ -94,36 +81,34 @@ Without the C++ Build Tools, `cargo build -p jarvis-app` will fail with a linker
 
 ### Option A — Automatic (recommended)
 
-One script handles everything: checks dependencies, downloads Vosk speech models (~200 MB), and installs frontend packages.
-
 ```powershell
 # 1. Clone the repository
 git clone https://github.com/vovazlo97/jarvis.git
 cd jarvis
 
-# 2. Run setup (downloads Vosk models, installs npm packages)
+# 2. Run setup (downloads Vosk models ~200 MB, installs npm packages)
 powershell -ExecutionPolicy Bypass -File setup.ps1
 
-# 3. Build and start the backend voice engine (Terminal 1)
-cargo build -p jarvis-app
+# 3. Build both binaries at once
+cargo build -p jarvis-app -p jarvis-gui
+
+# 4. Terminal 1 — start the backend voice engine
 .\target\debug\jarvis-app.exe
 
-# 4. In a NEW terminal — start the GUI
+# 5. Terminal 2 — start the GUI
 cd crates/jarvis-gui
 cargo tauri dev
 ```
 
-> **Two terminals are required.** `jarvis-app` (voice engine) and `jarvis-gui` (configuration window) are separate processes that must both run at the same time.
+> **Two terminals are required.** `jarvis-app` (voice engine) and `jarvis-gui` (configuration window) are separate processes that communicate via IPC.
 
-> First build takes **5–15 minutes** — Rust compiles all dependencies from scratch. Subsequent builds are incremental (under 1 minute).
+> First build takes **5–15 minutes** — Rust compiles all dependencies from scratch. Subsequent builds are under 1 minute.
 
 ---
 
 ### Option B — Manual step by step
 
 **Step 1 — Install Rust**
-
-Go to https://rustup.rs/ and follow the instructions, or use winget:
 
 ```powershell
 winget install Rustlang.Rustup
@@ -140,9 +125,7 @@ cargo --version
 
 **Step 2 — Install Node.js**
 
-Download v18+ (LTS) from https://nodejs.org/
-
-Verify:
+Download v18+ (LTS) from https://nodejs.org/ and verify:
 
 ```powershell
 node --version    # v18.x.x or later
@@ -170,8 +153,7 @@ cd jarvis
 
 **Step 5 — Download Vosk speech models**
 
-Create the `resources/vosk/` directory and download the models below.
-Extract each zip so the directory structure matches exactly:
+Create the `resources/vosk/` directory and extract each zip so the structure matches exactly:
 
 ```
 resources/
@@ -208,36 +190,32 @@ The application is made of **two separate processes** that must both run simulta
 | `jarvis-app.exe` | `crates/jarvis-app` | Voice engine: wake word → STT → command routing |
 | `jarvis-gui` (Tauri window) | `crates/jarvis-gui` | Configuration GUI |
 
-**Terminal 1 — Build and start the backend:**
-
 ```powershell
-# From the repository root
-# DLLs from lib/windows/amd64/ are copied automatically by build.rs
-cargo build -p jarvis-app
-.\target\debug\jarvis-app.exe
+# Quick: build both binaries at once (from repository root)
+cargo build -p jarvis-app -p jarvis-gui
 ```
 
-Leave this terminal open. The backend prints logs and listens for the wake word.
-
-**Terminal 2 — Start the GUI:**
+Then in two separate terminals:
 
 ```powershell
+# Terminal 1 — start the backend
+.\target\debug\jarvis-app.exe
+
+# Terminal 2 — start the GUI with hot reload
 cd crates/jarvis-gui
 cargo tauri dev
 ```
 
-During the first build, `fastembed` will also download embedding models (~100 MB) automatically. Just let it finish.
+During the first build, `fastembed` will download embedding models (~100 MB) automatically.
 
-> **Why two terminals?** `cargo tauri dev` only builds `jarvis-gui`. It does not build or launch `jarvis-app`. The two processes communicate via IPC — they must both be running for voice commands to work.
-
-**Debug logging** (run before launching each process):
+**Debug logging:**
 
 ```powershell
-# Terminal 1 — backend with full logging
+# Terminal 1
 $env:RUST_LOG = "debug"
 .\target\debug\jarvis-app.exe
 
-# Terminal 2 — GUI with full logging
+# Terminal 2
 $env:RUST_LOG = "debug"
 cd crates/jarvis-gui
 cargo tauri dev
@@ -247,15 +225,13 @@ cargo tauri dev
 
 **Step 8 — Building for Production**
 
-### Step 8a — Build the backend binary
-
 ```powershell
-# From the repository root
-cargo build --release -p jarvis-app
-# Output: target/release/jarvis-app.exe
+# Build both release binaries at once (from repository root)
+cargo build --release -p jarvis-app -p jarvis-gui
+# Output: target/release/jarvis-app.exe  +  target/release/jarvis-gui.exe
 ```
 
-### Step 8b — Build the Tauri installer
+To build the full Tauri installer (NSIS/MSI):
 
 ```powershell
 cd crates/jarvis-gui
@@ -264,18 +240,9 @@ cargo tauri build
 #         target/release/bundle/msi/jarvis-app_<version>_x64_en-US.msi
 ```
 
-### Step 8c — Copy the backend into the release folder
+> The Tauri installer **does not yet bundle `jarvis-app.exe` automatically** (see [Required Config Changes](#required-config-changes)). Until that is applied, ship the installer and `jarvis-app.exe` together, or place `jarvis-app.exe` in the same folder as the installed `jarvis-gui.exe`.
 
-The Tauri installer **does not yet bundle `jarvis-app.exe` automatically** (see [Required Config Changes](#required-config-changes) below for how to fix this). Until that is applied, copy manually:
-
-```powershell
-# Run from the repository root
-Copy-Item target\release\jarvis-app.exe -Destination target\release\
-```
-
-All DLLs (`libvosk.dll`, `libpv_recorder.dll`, etc.) from `lib/windows/amd64/` are bundled into the installer automatically via the `bundle.resources` setting in `tauri.conf.json`.
-
-To distribute, ship the installer **and** `jarvis-app.exe` together, or place `jarvis-app.exe` in the same folder as the installed `jarvis-gui.exe`.
+All DLLs (`libvosk.dll`, `libpv_recorder.dll`, etc.) from `lib/windows/amd64/` are bundled into the installer automatically via `bundle.resources` in `tauri.conf.json`.
 
 ---
 
@@ -289,26 +256,21 @@ jarvis/
 │   ├── jarvis-gui/         # Tauri desktop app (GUI + backend Tauri commands)
 │   └── jarvis-cli/         # CLI tool for development and testing
 ├── frontend/
-│   └── src/
-│       └── routes/
-│           ├── commands/   # Commands GUI (pack list + command editor)
-│           └── scripts/    # Scripts GUI (script list + step builder)
+│   └── src/routes/
+│       ├── commands/       # Commands GUI (pack list + command editor)
+│       └── scripts/        # Scripts GUI (script list + step builder)
 ├── resources/
 │   ├── commands/           # Command packs — one subfolder per pack, each with command.toml
-│   │   ├── browser/command.toml
-│   │   ├── games/command.toml
-│   │   └── ...
 │   ├── scripts/            # Script TOML files (created and managed via GUI)
 │   ├── sound/              # Voice packs and audio feedback files
 │   ├── vosk/               # Vosk STT models (downloaded by setup.ps1, not in git)
 │   └── keywords/           # Wake word detection files
 ├── lib/
 │   └── windows/amd64/      # Runtime DLLs required for build (Vosk, PvRecorder)
-├── .cargo/
-│   └── config.toml         # Linker flags pointing to lib/windows/amd64/
+├── .cargo/config.toml      # Linker flags pointing to lib/windows/amd64/
 ├── setup.ps1               # One-command setup script
 ├── Cargo.toml              # Workspace manifest
-└── Cargo.lock              # Locked dependency versions
+└── Cargo.lock
 ```
 
 ---
@@ -317,19 +279,17 @@ jarvis/
 
 A **command** is a single voice-triggered action — open an application, navigate to a URL, run a shell command, or control the system.
 
-### How a command works
+### Voice matching pipeline
 
-1. You speak a phrase
-2. JARVIS transcribes it via Vosk (offline STT)
-3. The intent engine matches your phrase against registered commands
-4. The matching command executes its action (launches exe, runs CLI, opens URL)
-5. JARVIS plays a confirmation sound
+| Step | Method | Threshold |
+|---|---|---|
+| 1 | Regex pattern match | Exact |
+| 2 | Embedding intent classifier | ≥ 88% confidence |
+| 3 | Fuzzy (Levenshtein) fallback | ≥ 75% similarity |
 
 ### Command file structure
 
-Commands live in `resources/commands/<pack-name>/command.toml`. Each pack is a folder grouping related commands.
-
-**Example — browser pack:**
+Commands live in `resources/commands/<pack-name>/command.toml`:
 
 ```toml
 [[commands]]
@@ -349,63 +309,52 @@ sounds.ru  = ["ok1", "ok2", "ok3"]
 
 | Type | What it does | Required fields |
 |---|---|---|
-| `exe` | Launch an executable or open a URL in the default browser | `exe_path`, `exe_args` |
+| `exe` | Launch an executable or open a URL | `exe_path`, `exe_args` |
 | `cli` | Run a PowerShell or CMD command | `cli_cmd`, `cli_args` |
 
 ### Adding a command via GUI
 
-1. Open JARVIS → **Commands** tab in the sidebar
-2. Select an existing pack or create a new one
-3. Click **Add command**
-4. Fill in: ID, type, path/command, voice phrases
-5. Click **Save** — the command is active immediately
-
-### Voice matching pipeline
-
-When you speak, JARVIS tries to find a match in this order:
-
-| Step | Method | Threshold |
-|---|---|---|
-| 1 | Regex pattern match | Exact |
-| 2 | Embedding intent classifier | ≥ 88% confidence |
-| 3 | Fuzzy (Levenshtein) fallback | ≥ 75% similarity |
-
-If nothing matches → JARVIS plays the `not_found` audio response.
+1. Open JARVIS → **Commands** tab
+2. Select or create a pack
+3. Click **Add command**, fill in fields, click **Save**
 
 ---
 
 ## Scripts System
 
-A **script** is a sequence of steps triggered by a single voice phrase. Use scripts to automate multi-step workflows that would otherwise require several separate commands.
+A **script** chains multiple steps triggered by a single voice phrase.
 
-### How a script works
+### Execution modes
 
-1. You speak a trigger phrase assigned to the script
-2. JARVIS matches it against registered script triggers
-3. All steps execute in the chosen mode (sequential or parallel)
-4. JARVIS plays a confirmation sound when done
+| Mode | Behavior |
+|---|---|
+| `sequential` | Steps run one by one; `delay` steps pause execution |
+| `parallel` | All steps start simultaneously in separate threads |
+
+### Step types
+
+| Type | Description | Key fields |
+|---|---|---|
+| `command_ref` | Run an existing command from any pack | `pack`, `command_id` |
+| `delay` | Pause for N milliseconds | `delay_ms` |
+| `custom` | Run any PowerShell or CMD command | `cli_cmd`, `cli_args` |
+| `spotify` | Control Spotify playback | `spotify_action`, `spotify_track_id` |
 
 ### Script file structure
-
-Scripts are stored in `resources/scripts/<id>.toml` and fully managed through the GUI.
-
-**Example — "Work Mode" script:**
 
 ```toml
 id          = "work_mode"
 name        = "Work Mode"
-description = "Opens browser and starts music for a productive session"
 mode        = "sequential"
 
-phrases_ru = ["режим работы", "рабочий режим", "включи рабочий режим"]
-phrases_en = ["work mode", "enable work mode", "start work mode"]
+phrases_ru = ["режим работы", "рабочий режим"]
+phrases_en = ["work mode", "enable work mode"]
 patterns   = ["режим.?работ"]
 
 [[steps]]
 step_type  = "command_ref"
 pack       = "browser"
 command_id = "open_youtube"
-label      = "Open YouTube"
 
 [[steps]]
 step_type = "delay"
@@ -415,39 +364,18 @@ delay_ms  = 2000
 step_type        = "spotify"
 spotify_action   = "play_track"
 spotify_track_id = "4uLU6hMCjMI75M1A2tKUQC"
-label            = "Start focus playlist"
 
 [[steps]]
 step_type = "custom"
 cli_cmd   = "powershell"
 cli_args  = ["-Command", "Start-Process notepad"]
-label     = "Open Notepad"
 ```
-
-### Execution modes
-
-| Mode | Behavior |
-|---|---|
-| `sequential` | Steps run one by one in order; `delay` steps pause execution |
-| `parallel` | All steps start simultaneously in separate threads |
-
-### Step types
-
-| Type | Description | Key fields |
-|---|---|---|
-| `command_ref` | Run an existing command from any pack | `pack`, `command_id` |
-| `delay` | Pause execution for N milliseconds | `delay_ms` |
-| `custom` | Run any PowerShell or CMD command | `cli_cmd`, `cli_args` |
-| `spotify` | Control Spotify playback | `spotify_action`, `spotify_track_id` |
 
 ### Adding a script via GUI
 
-1. Open JARVIS → **Scripts** tab in the sidebar
-2. Click **New script**
-3. Set: ID, name, description, execution mode (`sequential` / `parallel`)
-4. Add voice trigger phrases (Russian / English) and/or regex patterns
-5. Add steps using the visual step builder
-6. Click **Save** — the script is active immediately, no restart needed
+1. Open JARVIS → **Scripts** tab → **New script**
+2. Set ID, name, mode, trigger phrases, regex patterns
+3. Add steps via the visual builder → **Save** (active immediately, no restart)
 
 ---
 
@@ -458,18 +386,15 @@ label     = "Open Notepad"
 | **Purpose** | One action | Multi-step workflow |
 | **Storage** | `resources/commands/<pack>/command.toml` | `resources/scripts/<id>.toml` |
 | **Steps** | Single (exe or cli) | Many (any combination) |
-| **Execution order** | — | Sequential or Parallel |
-| **Use when** | "Open Chrome", "Volume up" | "Work mode", "Gaming setup", "Morning routine" |
+| **Use when** | "Open Chrome", "Volume up" | "Work mode", "Gaming setup" |
 
 ---
 
 ## Adding Custom Workflows
 
-**Scenario:** You want to say *"gaming mode"* and have JARVIS automatically open Steam, wait 3 seconds, then start your gaming Spotify playlist.
+**Scenario:** Say *"gaming mode"* → open Steam, wait 3 seconds, start Spotify playlist.
 
-**Step 1 — Make sure Steam has a command**
-
-If you don't have a games pack yet, create `resources/commands/games/command.toml`:
+**Step 1 — Ensure Steam has a command** (`resources/commands/games/command.toml`):
 
 ```toml
 [[commands]]
@@ -479,12 +404,9 @@ exe_path   = "C:\\Program Files (x86)\\Steam\\steam.exe"
 exe_args   = []
 phrases.ru = ["открой стим", "запусти стим"]
 phrases.en = ["open steam", "launch steam"]
-sounds.ru  = ["ok1", "ok2"]
 ```
 
-**Step 2 — Create the script in the GUI**
-
-Open Scripts → New script, then configure:
+**Step 2 — Create the script** (Scripts → New script):
 
 | Field | Value |
 |---|---|
@@ -493,26 +415,18 @@ Open Scripts → New script, then configure:
 | Phrases (RU) | `игровой режим`, `режим игры` |
 | Phrases (EN) | `gaming mode`, `start gaming` |
 
-Add steps:
+Steps:
 1. `command_ref` → pack: `games`, command: `open_steam`
 2. `delay` → `3000` ms
-3. `spotify` → action: `play_track`, track ID: *(your Spotify track URI)*
-
-Click **Save**.
-
-**Step 3 — Say the phrase**
-
-*"Gaming mode"* — JARVIS launches Steam, waits 3 seconds, starts the music.
+3. `spotify` → your track URI
 
 ---
 
 ## Required Config Changes
 
-> These changes are **not yet applied** to the repository. They are needed to make production builds fully automatic — so `jarvis-app.exe` is bundled into the installer and launched by the GUI without a second terminal.
+> These changes are **not yet applied**. Needed for production builds where `jarvis-app.exe` is bundled into the installer and auto-launched by the GUI.
 
 ### 1. `crates/jarvis-gui/tauri.conf.json` — add `externalBin`
-
-In the `bundle` section, add an `externalBin` entry pointing to the compiled backend:
 
 ```json
 "bundle": {
@@ -530,17 +444,9 @@ In the `bundle` section, add an `externalBin` entry pointing to the compiled bac
 }
 ```
 
-With this change, `cargo tauri build` will:
-1. Copy `jarvis-app.exe` into the installer package
-2. Extract it next to `jarvis-gui.exe` when the user installs the app
-3. Make it available for the GUI to spawn as a managed subprocess
-
-### 2. `crates/jarvis-gui/src/main.rs` (or `events.rs`) — auto-spawn the backend on startup
-
-After adding `externalBin`, the GUI Rust code needs to launch the backend automatically when the window opens. This requires `tauri-plugin-shell`. Add to the app initialization:
+### 2. `crates/jarvis-gui/src/main.rs` — auto-spawn backend on startup
 
 ```rust
-// In the Tauri setup closure:
 let _backend = app.shell()
     .sidecar("jarvis-app")
     .expect("jarvis-app sidecar not configured")
@@ -548,11 +454,9 @@ let _backend = app.shell()
     .expect("failed to spawn jarvis-app");
 ```
 
-This spawns `jarvis-app` as a child process of the GUI — no second terminal needed for end users.
-
 ### 3. `crates/jarvis-gui/Cargo.toml` — no change needed
 
-`jarvis-app` is a **binary crate**, not a library. It cannot be listed as a Cargo dependency and should not be. The two-process architecture is intentional — the processes communicate via IPC sockets defined in `jarvis-core`. The `Cargo.toml` is correct as-is.
+`jarvis-app` is a binary crate, not a library. The two-process architecture is intentional — processes communicate via IPC sockets defined in `jarvis-core`.
 
 ---
 
@@ -560,14 +464,12 @@ This spawns `jarvis-app` as a child process of the GUI — no second terminal ne
 
 ### Build error: `linker error` or `libvosk not found`
 
-The Rust linker needs the DLLs in `lib/windows/amd64/`. Verify the directory exists:
-
 ```powershell
 ls lib/windows/amd64/
 # Expected: libvosk.dll, libvosk.lib, libpv_recorder.dll, etc.
 ```
 
-If the folder is missing, re-clone the repository — these files must be present.
+Re-clone the repository if the folder is missing.
 
 ### Build error: `cargo-tauri: command not found`
 
@@ -577,56 +479,36 @@ cargo install tauri-cli --version "^2"
 
 ### GUI opens but shows a blank window
 
-Frontend dependencies are missing:
-
 ```powershell
-cd frontend
-npm install
-cd ..
-cd crates/jarvis-gui
-cargo tauri dev
+cd frontend && npm install && cd ..
+cd crates/jarvis-gui && cargo tauri dev
 ```
 
 ### GUI opens but voice commands have no effect
 
-`jarvis-app.exe` (the voice engine) is not running. The GUI alone does not process voice input. Open a separate terminal and start the backend:
+`jarvis-app.exe` is not running. Start it in a separate terminal:
 
 ```powershell
-# Development mode
-.\target\debug\jarvis-app.exe
-
-# Release mode
-.\target\release\jarvis-app.exe
+.\target\debug\jarvis-app.exe   # development
+.\target\release\jarvis-app.exe # release
 ```
 
-Keep this terminal open alongside the GUI.
+### Backend exits immediately or crashes
 
-### Backend exits immediately or crashes on startup
-
-Most likely causes:
-1. **Missing Vosk models** — `resources/vosk/` does not exist or is empty. Run `setup.ps1` or download models manually (see Step 5).
-2. **Missing DLLs** — run `cargo build -p jarvis-app` first (the `build.rs` copies DLLs automatically). Do not run `jarvis-app.exe` from a different folder.
-3. **Full log** — run with debug logging to see the exact error:
-   ```powershell
-   $env:RUST_LOG = "debug"
-   .\target\debug\jarvis-app.exe
-   ```
+1. **Missing Vosk models** — run `setup.ps1` or download manually (Step 5)
+2. **Missing DLLs** — run `cargo build -p jarvis-app` first (`build.rs` copies DLLs automatically)
+3. **Full log** — `$env:RUST_LOG = "debug"; .\target\debug\jarvis-app.exe`
 
 ### Voice commands are not recognized
 
-1. Confirm `jarvis-app.exe` is running in a separate terminal (see above)
-2. Open **Windows Sound Settings** → set your microphone as the default recording device
-3. Verify models are in `resources/vosk/` with exact folder names (no extra nesting)
-4. Read the backend terminal output — STT errors are printed there
-5. Try running setup again: `powershell -ExecutionPolicy Bypass -File setup.ps1`
-
-### First build is very slow (5–15 min)
-
-This is normal. Rust compiles all dependencies from source on the first build. Subsequent builds reuse cached artifacts and take under 1 minute.
+1. Confirm `jarvis-app.exe` is running
+2. Set your microphone as the default recording device in Windows Sound Settings
+3. Verify models in `resources/vosk/` with exact folder names
+4. Check backend terminal output for STT errors
 
 ### Build downloads ~100 MB during compilation
 
-The `fastembed` crate downloads ONNX embedding model weights on first build. This is automatic and happens only once.
+The `fastembed` crate downloads ONNX embedding model weights on first build. Automatic, happens only once.
 
 ---
 
@@ -649,42 +531,17 @@ cargo check --workspace
 # Run core library unit tests
 cargo test -p jarvis-core
 
-# Run Rust linter
+# Lint
 cargo clippy --workspace
 
-# --- Development mode (two terminals) ---
+# Build both debug binaries at once
+cargo build -p jarvis-app -p jarvis-gui
 
-# Terminal 1: build and start the backend
-cargo build -p jarvis-app
-.\target\debug\jarvis-app.exe
+# Build both release binaries at once
+cargo build --release -p jarvis-app -p jarvis-gui
 
-# Terminal 2: start the GUI with hot reload
-cd crates/jarvis-gui
-cargo tauri dev
-
-# --- Release builds ---
-
-# Build the backend binary
-cargo build --release -p jarvis-app
-# Output: target/release/jarvis-app.exe
-
-# Build the Tauri installer
-cd crates/jarvis-gui
-cargo tauri build
-# Output: target/release/bundle/nsis/  and  target/release/bundle/msi/
-```
-
-Enable verbose logging for both processes:
-
-```powershell
-# Terminal 1 — backend
-$env:RUST_LOG = "debug"
-.\target\debug\jarvis-app.exe
-
-# Terminal 2 — GUI
-$env:RUST_LOG = "debug"
-cd crates/jarvis-gui
-cargo tauri dev
+# Full Tauri installer
+cd crates/jarvis-gui && cargo tauri build
 ```
 
 ---
