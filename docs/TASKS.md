@@ -4,7 +4,6 @@
 
 ### In Progress
 
-- [ ] TASK-001: Implement Event Bus (tokio broadcast channels)
 - [ ] TASK-002: Refactor Command Registry with atomic writes
 - [ ] TASK-003: Define Plugin Manifest schema (plugin.json)
 - [ ] TASK-004: Define Agent Registry schema
@@ -13,6 +12,7 @@
 ### Done
 
 - [x] TASK-000: Create .claude/ infrastructure + CLAUDE.md + MEMORY.md + TASKS.md
+- [x] TASK-001: Implement Event Bus (tokio broadcast channels)
 
 ## 📋 Backlog — Phase B: Documentation
 
