@@ -4,9 +4,9 @@ use std::time::SystemTime;
 use jarvis_core::{
     audio,
     audio_buffer::AudioRingBuffer,
-    audio_processing, commands, config, i18n, intent,
+    audio_processing, command_registry, commands, config, i18n, intent,
     ipc::{self, IpcEvent},
-    listener, recorder, scripts, slots, stt, voices, AssistantState, COMMANDS_LIST, SOUND_DIR,
+    listener, recorder, scripts, slots, stt, voices, AssistantState, SOUND_DIR,
 };
 use rand::seq::SliceRandom;
 
@@ -429,7 +429,7 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
 
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
-    let commands_guard = COMMANDS_LIST.read();
+    let commands_guard = command_registry::read();
     let commands_list = &*commands_guard;
 
     let cmd_result = if let Some((intent_id, confidence)) = rt.block_on(intent::classify(text)) {

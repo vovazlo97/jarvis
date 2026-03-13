@@ -297,7 +297,7 @@ fn exec_step(step: &ScriptStep) -> Result<(), String> {
 
 fn exec_command_ref(step: &ScriptStep) -> Result<(), String> {
     // Look up the command in the already-loaded COMMANDS_LIST
-    let cmds_guard = crate::COMMANDS_LIST.read();
+    let cmds_guard = crate::command_registry::read();
     let cmds_list = &*cmds_guard;
 
     for cmd_list in cmds_list {

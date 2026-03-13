@@ -5,10 +5,9 @@ use std::sync::Arc;
 
 // include core
 use jarvis_core::{
-    audio, audio_processing, commands, config, db, i18n, intent,
+    audio, audio_processing, command_registry, commands, config, db, i18n, intent,
     ipc::{self, IpcAction},
-    listener, models, recorder, scripts, stt, voices, APP_CONFIG_DIR, APP_DIR, APP_LOG_DIR,
-    COMMANDS_LIST, DB,
+    listener, models, recorder, scripts, stt, voices, APP_CONFIG_DIR, APP_DIR, APP_LOG_DIR, DB,
 };
 
 // include log
@@ -117,7 +116,7 @@ fn main() -> Result<(), String> {
         script_count
     );
 
-    *COMMANDS_LIST.write() = cmds;
+    command_registry::load(cmds);
 
     // init audio
     if audio::init().is_err() {
@@ -135,7 +134,7 @@ fn main() -> Result<(), String> {
     let rt = Arc::new(tokio::runtime::Runtime::new().expect("Failed to create tokio runtime"));
 
     // init intent-recognition engine
-    let cmds_for_intent = COMMANDS_LIST.read().to_vec();
+    let cmds_for_intent = command_registry::get_snapshot();
     rt.block_on(async {
         if let Err(e) = intent::init(&cmds_for_intent).await {
             error!("Failed to initialize intent classifier: {}", e);
@@ -172,11 +171,11 @@ fn main() -> Result<(), String> {
                 info!("Received reload commands request — reloading from disk");
                 match commands::parse_commands() {
                     Ok(new_cmds) => {
-                        *COMMANDS_LIST.write() = new_cmds;
+                        command_registry::load(new_cmds);
                         info!("Commands reloaded successfully");
                         // Retrain intent classifier in background so new voice phrases work.
                         // Audio pipeline (wake word, STT, recorder) is NOT touched.
-                        let cmds_snapshot = COMMANDS_LIST.read().to_vec();
+                        let cmds_snapshot = command_registry::get_snapshot();
                         let reload_rt = Arc::clone(&rt_for_reload);
                         std::thread::spawn(move || {
                             if let Err(e) = reload_rt.block_on(intent::reinit(&cmds_snapshot)) {
