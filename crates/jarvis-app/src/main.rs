@@ -173,12 +173,15 @@ fn main() -> Result<(), String> {
                     Ok(new_cmds) => {
                         command_registry::load(new_cmds);
                         info!("Commands reloaded successfully");
-                        // Retrain intent classifier in background so new voice phrases work.
-                        // Audio pipeline (wake word, STT, recorder) is NOT touched.
-                        let cmds_snapshot = command_registry::get_snapshot();
+                        // Merge script virtual commands so the intent classifier
+                        // also learns new script voice triggers on hot-reload.
+                        let mut all_cmds = command_registry::get_snapshot();
+                        let script_virtual =
+                            scripts::as_virtual_commands(&scripts::parse_scripts());
+                        all_cmds.extend(script_virtual);
                         let reload_rt = Arc::clone(&rt_for_reload);
                         std::thread::spawn(move || {
-                            if let Err(e) = reload_rt.block_on(intent::reinit(&cmds_snapshot)) {
+                            if let Err(e) = reload_rt.block_on(intent::reinit(&all_cmds)) {
                                 error!("Intent classifier reload failed: {}", e);
                             }
                         });

@@ -424,6 +424,40 @@ mod tests {
         let result = load_script("definitely_nonexistent_id_xyz_abc_12345");
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_as_virtual_commands_includes_phrases() {
+        let script = Script {
+            id: "test_script".to_string(),
+            name: "Test Script".to_string(),
+            description: String::new(),
+            phrases_ru: vec!["привет мир".to_string()],
+            phrases_en: vec!["hello world".to_string()],
+            steps: vec![],
+            mode: "sequential".to_string(),
+            patterns: vec![],
+            sounds_ru: vec![],
+            response_sound: String::new(),
+        };
+        let virtual_cmds = as_virtual_commands(&[script]);
+        assert_eq!(virtual_cmds.len(), 1);
+        let cmd = &virtual_cmds[0].commands[0];
+        assert_eq!(cmd.cmd_type, "script_ref");
+        assert_eq!(cmd.id, "test_script");
+        // Core purpose: verify phrases are propagated for intent classifier training
+        let phrases_ru = cmd.phrases.get("ru").map(|v| v.as_slice()).unwrap_or(&[]);
+        let phrases_en = cmd.phrases.get("en").map(|v| v.as_slice()).unwrap_or(&[]);
+        assert!(
+            phrases_ru.contains(&"привет мир".to_string()),
+            "phrases_ru not propagated: {:?}",
+            phrases_ru
+        );
+        assert!(
+            phrases_en.contains(&"hello world".to_string()),
+            "phrases_en not propagated: {:?}",
+            phrases_en
+        );
+    }
 }
 
 pub fn as_virtual_commands(scripts: &[Script]) -> Vec<crate::JCommandsList> {
