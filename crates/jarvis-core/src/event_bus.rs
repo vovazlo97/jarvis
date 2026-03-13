@@ -57,9 +57,8 @@ pub fn init() -> broadcast::Sender<JarvisEvent> {
 /// Logs a warning if the bus has not been initialized.
 pub fn publish(event: JarvisEvent) {
     if let Some(tx) = EVENT_BUS_TX.get() {
-        match tx.send(event) {
-            Ok(n) => log::debug!("EventBus: published to {} subscriber(s)", n),
-            Err(_) => {}
+        if let Ok(n) = tx.send(event) {
+            log::debug!("EventBus: published to {} subscriber(s)", n)
         }
     } else {
         log::warn!(

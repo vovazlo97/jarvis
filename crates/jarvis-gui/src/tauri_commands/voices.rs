@@ -1,5 +1,9 @@
+use jarvis_core::{
+    config,
+    voices::{self, VoiceConfig},
+    SOUND_DIR,
+};
 use std::path::PathBuf;
-use jarvis_core::{voices::{self, VoiceConfig}, config, SOUND_DIR};
 
 #[tauri::command]
 pub fn list_voices() -> Vec<VoiceConfig> {
@@ -29,7 +33,9 @@ pub fn list_sound_files() -> Vec<String> {
 
 fn collect_audio_files_rel(dir: &PathBuf, base: &PathBuf, out: &mut Vec<String>) {
     const EXTS: &[&str] = &["wav", "mp3", "ogg"];
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
@@ -50,21 +56,26 @@ fn collect_audio_files_rel(dir: &PathBuf, base: &PathBuf, out: &mut Vec<String>)
 /// Returns the relative path from SOUND_DIR on success.
 #[tauri::command]
 pub fn import_sound_file(src_path: String, category: String) -> Result<String, String> {
-    let safe_cat: String = category.chars()
+    let safe_cat: String = category
+        .chars()
         .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
         .collect();
-    let safe_cat = if safe_cat.is_empty() { "general".to_string() } else { safe_cat };
+    let safe_cat = if safe_cat.is_empty() {
+        "general".to_string()
+    } else {
+        safe_cat
+    };
 
-    let dest_dir = SOUND_DIR.join(config::VOICES_PATH)
-        .join("user_custom").join(&safe_cat);
-    std::fs::create_dir_all(&dest_dir)
-        .map_err(|e| format!("Cannot create dir: {}", e))?;
+    let dest_dir = SOUND_DIR
+        .join(config::VOICES_PATH)
+        .join("user_custom")
+        .join(&safe_cat);
+    std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Cannot create dir: {}", e))?;
 
     let src = PathBuf::from(&src_path);
     let filename = src.file_name().ok_or("Invalid source path")?;
     let dest = dest_dir.join(filename);
-    std::fs::copy(&src_path, &dest)
-        .map_err(|e| format!("Cannot copy: {}", e))?;
+    std::fs::copy(&src_path, &dest).map_err(|e| format!("Cannot copy: {}", e))?;
 
     dest.strip_prefix(&*SOUND_DIR)
         .map(|rel| rel.to_string_lossy().replace('\\', "/"))

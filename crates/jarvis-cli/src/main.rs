@@ -1,9 +1,10 @@
 use std::io::{self, Write};
 
-use jarvis_core::{COMMANDS_LIST, DB, JCommandsList, commands, config, db, intent};
+use jarvis_core::{commands, config, db, intent, JCommandsList, COMMANDS_LIST, DB};
 
 fn print_help() {
-    println!("
+    println!(
+        "
 --## Jarvis CLI - Testing Tool ##--
 
 Commands:
@@ -15,7 +16,8 @@ Commands:
   settings           - Dump all settings
   help               - Show this help
   exit               - Exit the CLI
-");
+"
+    );
 }
 
 fn list_commands(commands: &[JCommandsList]) {
@@ -50,7 +52,11 @@ fn list_phrases(commands: &[JCommandsList]) {
 async fn classify_text(text: &str) {
     match intent::classify(text).await {
         Some((intent_id, confidence)) => {
-            println!("  ✓ Intent: {} (confidence: {:.2}%)", intent_id, confidence * 100.0);
+            println!(
+                "  ✓ Intent: {} (confidence: {:.2}%)",
+                intent_id,
+                confidence * 100.0
+            );
         }
         None => {
             println!("  ✗ No intent matched (below threshold)");
@@ -61,13 +67,17 @@ async fn classify_text(text: &str) {
 async fn execute_text(commands: &[JCommandsList], text: &str) {
     // try intent classification first
     if let Some((intent_id, confidence)) = intent::classify(text).await {
-        println!("  Intent: {} (confidence: {:.2}%)", intent_id, confidence * 100.0);
-        
+        println!(
+            "  Intent: {} (confidence: {:.2}%)",
+            intent_id,
+            confidence * 100.0
+        );
+
         if let Some((cmd_path, cmd)) = intent::get_command_by_intent(commands, &intent_id) {
             println!("  Command: {:?}", cmd_path);
             println!("  Type: {}", cmd.cmd_type);
             println!("  Executing...");
-            
+
             match commands::execute_command(cmd_path, cmd, Some(text), None) {
                 Ok(chain) => println!("  ✓ Success (chain: {})", chain),
                 Err(e) => println!("  ✗ Error: {}", e),
@@ -75,14 +85,14 @@ async fn execute_text(commands: &[JCommandsList], text: &str) {
             return;
         }
     }
-    
+
     // fallback to levenshtein
     println!("  Intent not matched, trying levenshtein fallback...");
     if let Some((cmd_path, cmd)) = commands::fetch_command(text, commands) {
         println!("  Command: {:?}", cmd_path);
         println!("  Type: {}", cmd.cmd_type);
         println!("  Executing...");
-        
+
         match commands::execute_command(cmd_path, cmd, Some(text), None) {
             Ok(chain) => println!("  ✓ Success (chain: {})", chain),
             Err(e) => println!("  ✗ Error: {}", e),
@@ -95,15 +105,13 @@ async fn execute_text(commands: &[JCommandsList], text: &str) {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // init logging
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    ).init();
-    
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     println!("Jarvis CLI v{}", config::APP_VERSION.unwrap_or("unknown"));
 
     // init dirs
     config::init_dirs()?;
-    
+
     // init settings
     let settings = db::init();
     DB.set(settings.arc().clone())
@@ -130,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(_) => println!("    Intent classifier ready"),
         Err(e) => println!("    Warning: {}", e),
     }
-    
+
     // init sound
     println!("[*] Initializing audio...");
     if let Err(e) = jarvis_core::audio::init() {
@@ -144,19 +152,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         print!("jarvis> ");
         io::stdout().flush()?;
-        
+
         input.clear();
         io::stdin().read_line(&mut input)?;
         let input = input.trim();
-        
+
         if input.is_empty() {
             continue;
         }
-        
+
         let parts: Vec<&str> = input.splitn(2, ' ').collect();
         let cmd = parts[0];
         let arg = parts.get(1).copied().unwrap_or("");
-        
+
         match cmd {
             "exit" | "quit" | "q" => {
                 println!("Bye!");
@@ -199,6 +207,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    
+
     Ok(())
 }

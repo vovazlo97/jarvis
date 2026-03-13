@@ -8,16 +8,17 @@ fn main() {
         let manifest_path = std::path::Path::new(&manifest_dir).join("app.manifest");
         if manifest_path.exists() {
             // MSVC linker: embed manifest as resource ID 1
-            println!(
-                "cargo:rustc-link-arg=/MANIFEST:EMBED"
-            );
+            println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
             println!(
                 "cargo:rustc-link-arg=/MANIFESTINPUT:{}",
                 manifest_path.display()
             );
             println!("cargo:rerun-if-changed=app.manifest");
         } else {
-            eprintln!("cargo:warning=app.manifest not found at {}", manifest_path.display());
+            eprintln!(
+                "cargo:warning=app.manifest not found at {}",
+                manifest_path.display()
+            );
         }
     }
 

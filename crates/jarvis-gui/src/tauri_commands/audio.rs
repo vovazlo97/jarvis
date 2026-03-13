@@ -9,7 +9,7 @@ pub fn pv_get_audio_devices() -> Vec<String> {
 
 #[tauri::command]
 pub fn pv_get_audio_device_name(idx: i32) -> String {
-     recorder::get_audio_device_name(idx)
+    recorder::get_audio_device_name(idx)
 }
 
 #[tauri::command(async)]

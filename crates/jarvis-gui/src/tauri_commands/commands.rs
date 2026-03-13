@@ -1,13 +1,12 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use jarvis_core::commands::{self, JCommand, JCommandsList};
-use jarvis_core::{APP_DIR, config};
+use jarvis_core::{config, APP_DIR};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 
-static COMMANDS: Lazy<Vec<JCommandsList>> = Lazy::new(|| {
-    commands::parse_commands().unwrap_or_default()
-});
+static COMMANDS: Lazy<Vec<JCommandsList>> =
+    Lazy::new(|| commands::parse_commands().unwrap_or_default());
 
 #[tauri::command]
 pub fn get_commands_count() -> usize {
@@ -16,7 +15,10 @@ pub fn get_commands_count() -> usize {
 
 #[tauri::command]
 pub fn get_commands_list() -> Vec<JCommand> {
-    COMMANDS.iter().flat_map(|list| list.commands.clone()).collect()
+    COMMANDS
+        .iter()
+        .flat_map(|list| list.commands.clone())
+        .collect()
 }
 
 // ── Editor API ────────────────────────────────────────────────────────────────
@@ -99,13 +101,15 @@ pub fn append_command_to_pack(pack_name: String, command: NewCommandInput) -> Re
     validate_name(&pack_name)?;
     let toml_path = pack_toml_path(&pack_name);
 
-    let content = fs::read_to_string(&toml_path)
-        .map_err(|e| format!("Cannot read pack: {}", e))?;
-    let mut list: JCommandsList = toml::from_str(&content)
-        .map_err(|e| format!("Cannot parse pack: {}", e))?;
+    let content = fs::read_to_string(&toml_path).map_err(|e| format!("Cannot read pack: {}", e))?;
+    let mut list: JCommandsList =
+        toml::from_str(&content).map_err(|e| format!("Cannot parse pack: {}", e))?;
 
     if list.commands.iter().any(|c| c.id == command.id) {
-        return Err(format!("Command '{}' already exists in '{}'", command.id, pack_name));
+        return Err(format!(
+            "Command '{}' already exists in '{}'",
+            command.id, pack_name
+        ));
     }
 
     list.commands.push(input_to_jcommand(&command)?);
@@ -122,12 +126,14 @@ pub fn update_command(
     validate_name(&pack_name)?;
     let toml_path = pack_toml_path(&pack_name);
 
-    let content = fs::read_to_string(&toml_path)
-        .map_err(|e| format!("Cannot read pack: {}", e))?;
-    let mut list: JCommandsList = toml::from_str(&content)
-        .map_err(|e| format!("Cannot parse pack: {}", e))?;
+    let content = fs::read_to_string(&toml_path).map_err(|e| format!("Cannot read pack: {}", e))?;
+    let mut list: JCommandsList =
+        toml::from_str(&content).map_err(|e| format!("Cannot parse pack: {}", e))?;
 
-    let pos = list.commands.iter().position(|c| c.id == old_id)
+    let pos = list
+        .commands
+        .iter()
+        .position(|c| c.id == old_id)
         .ok_or_else(|| format!("Command '{}' not found in '{}'", old_id, pack_name))?;
 
     list.commands[pos] = input_to_jcommand(&command)?;
@@ -140,15 +146,17 @@ pub fn delete_command(pack_name: String, command_id: String) -> Result<(), Strin
     validate_name(&pack_name)?;
     let toml_path = pack_toml_path(&pack_name);
 
-    let content = fs::read_to_string(&toml_path)
-        .map_err(|e| format!("Cannot read pack: {}", e))?;
-    let mut list: JCommandsList = toml::from_str(&content)
-        .map_err(|e| format!("Cannot parse pack: {}", e))?;
+    let content = fs::read_to_string(&toml_path).map_err(|e| format!("Cannot read pack: {}", e))?;
+    let mut list: JCommandsList =
+        toml::from_str(&content).map_err(|e| format!("Cannot parse pack: {}", e))?;
 
     let before = list.commands.len();
     list.commands.retain(|c| c.id != command_id);
     if list.commands.len() == before {
-        return Err(format!("Command '{}' not found in '{}'", command_id, pack_name));
+        return Err(format!(
+            "Command '{}' not found in '{}'",
+            command_id, pack_name
+        ));
     }
 
     if list.commands.is_empty() {
@@ -168,14 +176,14 @@ pub fn delete_command_pack(pack_name: String) -> Result<(), String> {
     if !pack_path.exists() {
         return Err(format!("Pack '{}' not found", pack_name));
     }
-    fs::remove_dir_all(&pack_path)
-        .map_err(|e| format!("Cannot delete pack '{}': {}", pack_name, e))
+    fs::remove_dir_all(&pack_path).map_err(|e| format!("Cannot delete pack '{}': {}", pack_name, e))
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 fn sanitize_pack_name(name: &str) -> Result<String, String> {
-    let safe: String = name.chars()
+    let safe: String = name
+        .chars()
         .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
         .collect();
     if safe.is_empty() {
@@ -194,16 +202,21 @@ fn validate_name(name: &str) -> Result<(), String> {
 }
 
 fn pack_toml_path(pack_name: &str) -> PathBuf {
-    APP_DIR.join(config::COMMANDS_PATH).join(pack_name).join("command.toml")
+    APP_DIR
+        .join(config::COMMANDS_PATH)
+        .join(pack_name)
+        .join("command.toml")
 }
 
 /// Build a JCommand from user input by round-tripping through TOML.
 /// This correctly sets all default fields without needing to touch private cache fields.
 fn input_to_jcommand(input: &NewCommandInput) -> Result<JCommand, String> {
     let toml_str = build_toml(input);
-    let list: JCommandsList = toml::from_str(&toml_str)
-        .map_err(|e| format!("Cannot build command from input: {}", e))?;
-    list.commands.into_iter().next()
+    let list: JCommandsList =
+        toml::from_str(&toml_str).map_err(|e| format!("Cannot build command from input: {}", e))?;
+    list.commands
+        .into_iter()
+        .next()
         .ok_or_else(|| "Empty command list after build".to_string())
 }
 
@@ -214,17 +227,24 @@ fn save_commands(commands: &[JCommand], path: &Path) -> Result<(), String> {
         path: std::path::PathBuf::new(),
         commands: commands.to_vec(),
     };
-    let content = toml::to_string_pretty(&list)
-        .map_err(|e| format!("Cannot serialize commands: {}", e))?;
-    fs::write(path, content)
-        .map_err(|e| format!("Cannot write TOML: {}", e))
+    let content =
+        toml::to_string_pretty(&list).map_err(|e| format!("Cannot serialize commands: {}", e))?;
+    fs::write(path, content).map_err(|e| format!("Cannot write TOML: {}", e))
 }
 
 /// Build a fresh [[commands]] TOML block from user input.
 fn build_toml(cmd: &NewCommandInput) -> String {
-    fn esc(s: &str) -> String { format!("{:?}", s) }
+    fn esc(s: &str) -> String {
+        format!("{:?}", s)
+    }
     fn esc_arr(v: &[String]) -> String {
-        format!("[{}]", v.iter().map(|s| format!("{:?}", s)).collect::<Vec<_>>().join(", "))
+        format!(
+            "[{}]",
+            v.iter()
+                .map(|s| format!("{:?}", s))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 
     let mut lines = vec![

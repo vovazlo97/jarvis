@@ -1,30 +1,28 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{APP_DIR, config};
+use crate::{config, APP_DIR};
 
 #[derive(Debug, Clone)]
 pub struct VoskModelInfo {
-    pub name: String,       // folder name: "vosk-model-small-ru-0.22"
-    pub path: PathBuf,      // full path
-    pub language: String,   // extracted from name: "ru"
-    pub size: String,       // "small", "large", etc.
+    pub name: String,     // folder name: "vosk-model-small-ru-0.22"
+    pub path: PathBuf,    // full path
+    pub language: String, // extracted from name: "ru"
+    pub size: String,     // "small", "large", etc.
 }
 
 // Scan for available Vosk models
 pub fn scan_vosk_models() -> Vec<VoskModelInfo> {
-    let models_dir = {
-        APP_DIR.join(config::VOSK_MODELS_PATH)
-    };
+    let models_dir = { APP_DIR.join(config::VOSK_MODELS_PATH) };
     let mut models = Vec::new();
-    
+
     info!("VOSK MODELS DIR: {}", models_dir.display());
 
     if !models_dir.exists() {
         warn!("Vosk models directory not found: {}", models_dir.display());
         return models;
     }
-    
+
     let entries = match fs::read_dir(models_dir) {
         Ok(e) => e,
         Err(e) => {
@@ -32,32 +30,33 @@ pub fn scan_vosk_models() -> Vec<VoskModelInfo> {
             return models;
         }
     };
-    
+
     for entry in entries {
         let entry = match entry {
             Ok(e) => e,
             Err(_) => continue,
         };
-        
+
         let path = entry.path();
-        
+
         // must be a directory
         if !path.is_dir() {
             continue;
         }
-        
+
         // check if it looks like a vosk model (has am/conf/graph folders or similar)
         if !is_vosk_model(&path) {
             continue;
         }
-        
-        let name = path.file_name()
+
+        let name = path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("")
             .to_string();
-        
+
         let (language, size) = parse_model_name(&name);
-        
+
         models.push(VoskModelInfo {
             name,
             path,
@@ -65,7 +64,7 @@ pub fn scan_vosk_models() -> Vec<VoskModelInfo> {
             size,
         });
     }
-    
+
     models.sort_by(|a, b| a.name.cmp(&b.name));
     models
 }
@@ -73,20 +72,20 @@ pub fn scan_vosk_models() -> Vec<VoskModelInfo> {
 // Check if directory looks like a Vosk model
 fn is_vosk_model(path: &Path) -> bool {
     // vosk models typically have these subdirectories
-    path.join("am").exists() || 
-    path.join("conf").exists() || 
-    path.join("graph").exists() ||
-    path.join("ivector").exists()
+    path.join("am").exists()
+        || path.join("conf").exists()
+        || path.join("graph").exists()
+        || path.join("ivector").exists()
 }
 
 // Extract language and size from model name
 // e.g., "vosk-model-small-ru-0.22" -> ("ru", "small")
 fn parse_model_name(name: &str) -> (String, String) {
     let parts: Vec<&str> = name.split('-').collect();
-    
+
     let mut language = String::from("unknown");
     let mut size = String::from("unknown");
-    
+
     // look for common size indicators
     for part in &parts {
         match *part {
@@ -98,7 +97,7 @@ fn parse_model_name(name: &str) -> (String, String) {
             _ => {}
         }
     }
-    
+
     (language, size)
 }
 

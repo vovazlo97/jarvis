@@ -6,28 +6,35 @@ use serde::{Deserialize, Serialize};
 pub enum IpcEvent {
     // Wake word detected, starting to listen
     WakeWordDetected,
-    
+
     // Actively listening for command
     Listening,
-    
+
     // Speech recognized
-    SpeechRecognized { text: String },
-    
+    SpeechRecognized {
+        text: String,
+    },
+
     // Command was executed
-    CommandExecuted { id: String, success: bool },
-    
+    CommandExecuted {
+        id: String,
+        success: bool,
+    },
+
     // Returned to idle state
     Idle,
-    
+
     // Error occurred
-    Error { message: String },
-    
+    Error {
+        message: String,
+    },
+
     // App started
     Started,
-    
+
     // App is shutting down
     Stopping,
-    
+
     // Pong response
     Pong,
 
@@ -37,7 +44,9 @@ pub enum IpcEvent {
     /// High-level assistant state transition.
     /// Lifecycle: Idle → Activated → Listening → Processing → Responding → Idle
     /// Responding → Listening only when allow_chaining = true.
-    StateChanged { state: crate::state::AssistantState },
+    StateChanged {
+        state: crate::state::AssistantState,
+    },
 }
 
 // Actions sent from GUI to jarvis-app
@@ -46,13 +55,13 @@ pub enum IpcEvent {
 pub enum IpcAction {
     // Request graceful shutdown
     Stop,
-    
+
     // Reload commands from disk
     ReloadCommands,
-    
+
     // Ping to check connection
     Ping,
-    
+
     // Mute/unmute listening
     SetMuted { muted: bool },
 

@@ -1,9 +1,9 @@
-use sysinfo::{System, Pid, ProcessRefreshKind, RefreshKind, CpuRefreshKind, Components};
-use peak_alloc::PeakAlloc;
-use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use std::process::Command;
+use peak_alloc::PeakAlloc;
 use std::env;
+use std::process::Command;
+use std::sync::Mutex;
+use sysinfo::{Components, CpuRefreshKind, Pid, ProcessRefreshKind, RefreshKind, System};
 
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
@@ -12,13 +12,12 @@ static SYS: Lazy<Mutex<System>> = Lazy::new(|| {
     Mutex::new(System::new_with_specifics(
         RefreshKind::nothing()
             .with_processes(ProcessRefreshKind::nothing().with_memory().with_cpu())
-            .with_cpu(CpuRefreshKind::everything())
+            .with_cpu(CpuRefreshKind::everything()),
     ))
 });
 
-static COMPONENTS: Lazy<Mutex<Components>> = Lazy::new(|| {
-    Mutex::new(Components::new_with_refreshed_list())
-});
+static COMPONENTS: Lazy<Mutex<Components>> =
+    Lazy::new(|| Mutex::new(Components::new_with_refreshed_list()));
 
 const JARVIS_APP_NAME: &str = "jarvis-app";
 
@@ -43,10 +42,10 @@ pub struct JarvisAppStats {
 #[tauri::command]
 pub fn get_jarvis_app_stats() -> JarvisAppStats {
     let mut sys = SYS.lock().unwrap();
-    
+
     // refresh all processes to find jarvis-app
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-    
+
     if let Some(pid) = find_jarvis_app_pid(&sys) {
         if let Some(proc) = sys.process(pid) {
             return JarvisAppStats {
@@ -56,7 +55,7 @@ pub fn get_jarvis_app_stats() -> JarvisAppStats {
             };
         }
     }
-    
+
     JarvisAppStats {
         running: false,
         ram_mb: 0,
@@ -68,13 +67,13 @@ pub fn get_jarvis_app_stats() -> JarvisAppStats {
 pub fn get_current_ram_usage() -> u64 {
     let mut sys = SYS.lock().unwrap();
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-    
+
     if let Some(pid) = find_jarvis_app_pid(&sys) {
         if let Some(proc) = sys.process(pid) {
             return proc.memory() / 1024 / 1024;
         }
     }
-    
+
     0
 }
 
@@ -89,7 +88,7 @@ pub fn is_jarvis_app_running() -> bool {
 pub fn get_cpu_temp() -> String {
     let mut components = COMPONENTS.lock().unwrap();
     components.refresh(true);
-    
+
     for component in components.iter() {
         let label = component.label().to_lowercase();
         if label.contains("cpu") || label.contains("core") || label.contains("package") {
@@ -98,24 +97,24 @@ pub fn get_cpu_temp() -> String {
             }
         }
     }
-    
+
     if let Some(component) = components.iter().next() {
         if let Some(temp) = component.temperature() {
             return format!("{:.1}", temp);
         }
     }
-    
+
     String::from("N/A")
 }
 
 #[tauri::command]
 pub fn get_cpu_usage() -> f32 {
     let mut sys = SYS.lock().unwrap();
-    
+
     sys.refresh_cpu_all();
     std::thread::sleep(std::time::Duration::from_millis(200));
     sys.refresh_cpu_all();
-    
+
     sys.global_cpu_usage()
 }
 
@@ -128,15 +127,19 @@ pub fn get_peak_ram_usage() -> String {
 /// Called by the GUI after any command/script CRUD operation.
 #[tauri::command]
 pub async fn reload_jarvis_commands() -> Result<(), String> {
-    use tokio_tungstenite::connect_async;
     use futures_util::SinkExt;
+    use tokio_tungstenite::connect_async;
     use tokio_tungstenite::tungstenite::Message;
 
     let url = "ws://127.0.0.1:9712";
-    let (mut ws, _) = connect_async(url).await
+    let (mut ws, _) = connect_async(url)
+        .await
         .map_err(|e| format!("Cannot connect to jarvis-app (is it running?): {}", e))?;
-    ws.send(Message::Text(r#"{"action":"reload_commands"}"#.to_string().into())).await
-        .map_err(|e| format!("Cannot send reload command: {}", e))?;
+    ws.send(Message::Text(
+        r#"{"action":"reload_commands"}"#.to_string().into(),
+    ))
+    .await
+    .map_err(|e| format!("Cannot send reload command: {}", e))?;
     Ok(())
 }
 
@@ -163,7 +166,10 @@ pub fn run_jarvis_app() -> Result<(), String> {
     let jarvis_app_path = exe_dir.join(jarvis_app_name);
 
     if !jarvis_app_path.exists() {
-        return Err(format!("jarvis-app not found at: {}", jarvis_app_path.display()));
+        return Err(format!(
+            "jarvis-app not found at: {}",
+            jarvis_app_path.display()
+        ));
     }
 
     std::process::Command::new(&jarvis_app_path)

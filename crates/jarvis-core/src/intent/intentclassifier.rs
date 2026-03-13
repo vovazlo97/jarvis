@@ -1,21 +1,17 @@
-use intent_classifier::{
-    IntentPrediction, IntentError,
-    TrainingExample, TrainingSource, IntentId
-};
+use intent_classifier::{IntentError, IntentId, IntentPrediction, TrainingExample, TrainingSource};
 
-use std::sync::Arc;
 use std::fs;
+use std::sync::Arc;
 
 use crate::commands::{self, JCommandsList};
 use crate::models;
 use crate::models::intent_classifier::IntentClassifierModel;
-use crate::{APP_CONFIG_DIR, i18n};
+use crate::{i18n, APP_CONFIG_DIR};
 
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
-static MODEL: Lazy<RwLock<Option<Arc<IntentClassifierModel>>>> =
-    Lazy::new(|| RwLock::new(None));
+static MODEL: Lazy<RwLock<Option<Arc<IntentClassifierModel>>>> = Lazy::new(|| RwLock::new(None));
 
 const TRAINING_CACHE_FILE: &str = "intent_training.json";
 const COMMANDS_HASH_FILE: &str = "commands_hash.txt";
@@ -47,7 +43,10 @@ async fn train_and_set_model(commands: &[JCommandsList]) -> Result<(), String> {
     };
 
     if should_retrain {
-        info!("Training intent classifier with {} commands...", commands.len());
+        info!(
+            "Training intent classifier with {} commands...",
+            commands.len()
+        );
         train_classifier(&model.classifier, &commands).await?;
 
         if let Ok(export) = model.classifier.export_training_data().await {
@@ -58,7 +57,10 @@ async fn train_and_set_model(commands: &[JCommandsList]) -> Result<(), String> {
     } else {
         info!("Loading cached training data...");
         if let Ok(data) = fs::read_to_string(&cache_path) {
-            model.classifier.import_training_data(&data).await
+            model
+                .classifier
+                .import_training_data(&data)
+                .await
                 .map_err(|e| format!("Failed to import training data: {}", e))?;
         }
     }
@@ -76,7 +78,7 @@ pub async fn classify(text: &str) -> Result<IntentPrediction, IntentError> {
 
 async fn train_classifier(
     classifier: &intent_classifier::IntentClassifier,
-    commands: &[JCommandsList]
+    commands: &[JCommandsList],
 ) -> Result<(), String> {
     let lang = i18n::get_language();
     info!("Training intent classifier for language: {}", lang);
@@ -86,7 +88,7 @@ async fn train_classifier(
     for assistant_cmd in commands {
         for cmd in &assistant_cmd.commands {
             let phrases = cmd.get_phrases(&lang);
-            
+
             for phrase in phrases.iter() {
                 let example = TrainingExample {
                     text: phrase.clone(),
@@ -94,15 +96,20 @@ async fn train_classifier(
                     confidence: 1.0,
                     source: TrainingSource::Programmatic,
                 };
-                
-                classifier.add_training_example(example).await
+
+                classifier
+                    .add_training_example(example)
+                    .await
                     .map_err(|e| format!("Failed to add training example: {}", e))?;
-                
+
                 total_examples += 1;
             }
         }
     }
 
-    info!("Added {} training examples for language '{}'", total_examples, lang);
+    info!(
+        "Added {} training examples for language '{}'",
+        total_examples, lang
+    );
     Ok(())
 }

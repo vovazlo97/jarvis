@@ -73,7 +73,7 @@ pub fn play_sound(filename: &PathBuf) {
             return;
         }
     };
-    
+
     info!("Playing {}", filename.display());
 
     match audio_type {
