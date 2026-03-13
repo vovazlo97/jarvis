@@ -13,6 +13,7 @@
 - [x] TASK-000: Create .claude/ infrastructure + CLAUDE.md + MEMORY.md + TASKS.md
 - [x] TASK-001: Implement Event Bus (tokio broadcast channels)
 - [x] TASK-002: Refactor Command Registry with atomic writes
+- [x] TASK-006: Hot-reload команд и скриптов без перезапуска
 
 ## 📋 Backlog — Phase B: Documentation
 
