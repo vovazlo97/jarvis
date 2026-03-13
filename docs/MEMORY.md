@@ -14,7 +14,7 @@
 - **Version:** 0.1.0
 - **Active branch:** develop/phase-a-core-stabilization
 - **Phase:** A — Core Stabilization
-- **Last milestone:** TASK-001 Event Bus implemented — JarvisEvent + broadcast channel in jarvis-core (2026-03-13)
+- **Last milestone:** TASK-002 Command Registry refactored — command_registry module with atomic load(), all call sites migrated, COMMANDS_LIST pub(crate) (2026-03-13)
 
 ## Known Issues & Technical Debt
 
