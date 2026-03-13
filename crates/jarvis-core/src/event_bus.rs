@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::state::AssistantState;
 
 /// Internal event bus events — decoupled module-to-module communication.
 /// Separate from `IpcEvent` (which is for GUI/websocket communication).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum JarvisEvent {
     /// Wake word detected — pipeline starts.
@@ -16,8 +16,8 @@ pub enum JarvisEvent {
     /// STT produced a transcript.
     SpeechRecognized { text: String },
 
-    /// Intent classifier matched a command.
-    CommandRecognized { id: String, text: String },
+    /// Intent classifier matched a command. `utterance` is the original speech text.
+    CommandRecognized { id: String, utterance: String },
 
     /// Command dispatcher finished (success or failure).
     CommandExecuted { id: String, success: bool },
@@ -71,5 +71,22 @@ mod tests {
             JarvisEvent::Error { message } => assert_eq!(message, "oops"),
             _ => panic!("wrong variant"),
         }
+    }
+
+    #[test]
+    fn test_serde_unit_variant_tag() {
+        let e = JarvisEvent::WakeWordDetected;
+        let json = serde_json::to_string(&e).unwrap();
+        assert_eq!(json, r#"{"event":"wake_word_detected"}"#);
+    }
+
+    #[test]
+    fn test_serde_struct_variant_tag() {
+        let e = JarvisEvent::SpeechRecognized {
+            text: "hello".into(),
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        assert!(json.contains(r#""event":"speech_recognized""#));
+        assert!(json.contains(r#""text":"hello""#));
     }
 }
