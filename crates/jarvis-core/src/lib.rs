@@ -1,8 +1,8 @@
 use once_cell::sync::{Lazy, OnceCell};
 use parking_lot::RwLock;
-use std::{sync::Arc};
 use platform_dirs::AppDirs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[macro_use]
 extern crate log;
@@ -32,8 +32,8 @@ pub mod slots;
 pub mod models;
 
 // re-exported from models/
-pub use models::vosk_models;
 pub use models::gliner_models;
+pub use models::vosk_models;
 
 #[cfg(feature = "jarvis_app")]
 pub mod audio_processing;
@@ -47,6 +47,7 @@ pub mod audio_buffer;
 
 pub mod scripts;
 
+pub mod event_bus;
 pub mod state;
 pub use state::AssistantState;
 
@@ -66,8 +67,7 @@ pub static APP_DIRS: OnceCell<AppDirs> = OnceCell::new();
 pub static APP_CONFIG_DIR: OnceCell<PathBuf> = OnceCell::new();
 pub static APP_LOG_DIR: OnceCell<PathBuf> = OnceCell::new();
 pub static DB: OnceCell<Arc<RwLock<db::structs::Settings>>> = OnceCell::new();
-pub static COMMANDS_LIST: Lazy<RwLock<Vec<JCommandsList>>> =
-    Lazy::new(|| RwLock::new(Vec::new()));
+pub static COMMANDS_LIST: Lazy<RwLock<Vec<JCommandsList>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
 // re-exports
 pub use commands::JCommandsList;
