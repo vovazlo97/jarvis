@@ -47,6 +47,7 @@ pub mod audio_buffer;
 
 pub mod scripts;
 
+#[cfg(feature = "jarvis_app")]
 pub mod event_bus;
 pub mod state;
 pub use state::AssistantState;

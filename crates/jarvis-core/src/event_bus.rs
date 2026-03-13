@@ -54,19 +54,28 @@ pub fn init() -> broadcast::Sender<JarvisEvent> {
 
 /// Publish an event to all current subscribers.
 /// Silently ignores send errors (no receivers = normal during startup/shutdown).
+/// Logs a warning if the bus has not been initialized.
 pub fn publish(event: JarvisEvent) {
     if let Some(tx) = EVENT_BUS_TX.get() {
         match tx.send(event) {
             Ok(n) => log::debug!("EventBus: published to {} subscriber(s)", n),
             Err(_) => {}
         }
+    } else {
+        log::warn!(
+            "EventBus::publish() called before init() — event dropped: {:?}",
+            event
+        );
     }
 }
 
 /// Subscribe to the Event Bus. Returns a `Receiver` that gets all future events.
-/// Must call `init()` first, or this returns `None`.
-pub fn subscribe() -> Option<broadcast::Receiver<JarvisEvent>> {
-    EVENT_BUS_TX.get().map(|tx| tx.subscribe())
+/// Panics if `init()` has not been called first.
+pub fn subscribe() -> broadcast::Receiver<JarvisEvent> {
+    EVENT_BUS_TX
+        .get()
+        .expect("EventBus::subscribe() called before init() — call init() at startup")
+        .subscribe()
 }
 
 #[cfg(test)]
@@ -157,8 +166,10 @@ mod tests {
     #[test]
     fn test_init_idempotent() {
         let tx1 = init();
-        let tx2 = init();
-        drop(tx1);
-        drop(tx2);
+        let mut rx = tx1.subscribe();
+        let _tx2 = init(); // second call must return the same channel
+        tx1.send(JarvisEvent::Listening).ok();
+        // rx subscribed before second init() — must still receive (same channel)
+        assert!(matches!(rx.try_recv().unwrap(), JarvisEvent::Listening));
     }
 }

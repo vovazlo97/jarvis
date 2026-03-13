@@ -38,7 +38,7 @@ vosk = { version = "0.3.1", optional = true }
 intent-classifier = { version = "0.1.0", optional = true }
 # rustpotter = { workspace = true, optional = true }
 
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync"], optional = true }
 
 mlua = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
@@ -56,7 +56,7 @@ winrt-notification = { workspace = true, optional = true }
 [features]
 default = ["jarvis_app"]
 jarvis_app = [
-    "vosk", "intent-classifier", "fastembed", "nnnoiseless", "tokio-tungstenite", "futures-util",
+    "vosk", "intent-classifier", "fastembed", "tokio", "nnnoiseless", "tokio-tungstenite", "futures-util",
     "lua", "socket2",
     "ort", "ndarray", "tokenizers", "regex",]
 
