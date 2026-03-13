@@ -16,7 +16,7 @@ pub fn load(commands: Vec<JCommandsList>) {
 ///
 /// Multiple readers can hold guards simultaneously.
 /// The guard is released when it goes out of scope.
-pub fn read<'a>() -> RwLockReadGuard<'a, Vec<JCommandsList>> {
+pub fn read() -> RwLockReadGuard<'static, Vec<JCommandsList>> {
     COMMANDS_LIST.read()
 }
 
@@ -39,8 +39,7 @@ mod tests {
     use once_cell::sync::Lazy;
     use parking_lot::Mutex;
 
-    // Serialise all registry tests: they share the global COMMANDS_LIST, so
-    // running them in parallel produces non-deterministic counts.
+    // Serialise tests that touch the process-global COMMANDS_LIST.
     static TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
     fn make_pack(id: &str) -> JCommandsList {
@@ -50,12 +49,17 @@ mod tests {
         }
     }
 
+    /// Reset registry to empty between tests.
+    fn teardown() {
+        *crate::COMMANDS_LIST.write() = vec![];
+    }
+
     #[test]
     fn test_load_stores_commands() {
         let _g = TEST_LOCK.lock();
-        let pack = make_pack("test_pack_a");
-        load(vec![pack]);
+        load(vec![make_pack("test_pack_a")]);
         assert!(is_loaded());
+        teardown();
     }
 
     #[test]
@@ -65,6 +69,7 @@ mod tests {
         load(vec![make_pack("new_pack_1"), make_pack("new_pack_2")]);
         let snapshot = get_snapshot();
         assert_eq!(snapshot.len(), 2);
+        teardown();
     }
 
     #[test]
@@ -73,6 +78,7 @@ mod tests {
         load(vec![make_pack("snap_a"), make_pack("snap_b")]);
         let snapshot = get_snapshot();
         assert_eq!(snapshot.len(), 2);
+        teardown();
     }
 
     #[test]
@@ -81,6 +87,8 @@ mod tests {
         load(vec![make_pack("guard_pack")]);
         let guard = read();
         assert!(!guard.is_empty());
+        drop(guard);
+        teardown();
     }
 
     #[test]
@@ -88,5 +96,14 @@ mod tests {
         let _g = TEST_LOCK.lock();
         load(vec![make_pack("loaded_pack")]);
         assert!(is_loaded());
+        teardown();
+    }
+
+    #[test]
+    fn test_is_loaded_false_after_teardown() {
+        let _g = TEST_LOCK.lock();
+        load(vec![make_pack("some_pack")]);
+        teardown();
+        assert!(!is_loaded());
     }
 }
