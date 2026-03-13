@@ -429,8 +429,8 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
 
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
-    let commands_guard = command_registry::read();
-    let commands_list = &*commands_guard;
+    let commands_list = command_registry::get_snapshot();
+    let commands_list = &*commands_list;
 
     let cmd_result = if let Some((intent_id, confidence)) = rt.block_on(intent::classify(text)) {
         info!(
@@ -595,8 +595,8 @@ pub fn close(code: i32) {
 mod tests {
     use super::*;
 
-    /// Regression: execute_command must return false (no chain) when COMMANDS_LIST is
-    /// empty (not yet populated from disk) — i.e. the assistant must return to Idle,
+    /// Regression: execute_command must return false (no chain) when no commands have
+    /// been loaded via command_registry::load() (not yet populated from disk) — i.e. the assistant must return to Idle,
     /// never stay in Listening, regardless of what text was spoken.
     #[test]
     fn test_execute_command_returns_false_when_no_commands_loaded() {
