@@ -132,7 +132,10 @@ fn load_scripts_from_dir(
 
 pub fn parse_scripts() -> Vec<Script> {
     let bundled = APP_DIR.join("resources/scripts");
-    let user = config::user_scripts_dir();
+    let user = crate::APP_CONFIG_DIR
+        .get()
+        .map(|d| d.join("scripts"))
+        .unwrap_or_else(|| APP_DIR.join("resources/scripts"));
     info!(
         "parse_scripts() scanning bundled: {:?}, user: {:?}",
         bundled, user
