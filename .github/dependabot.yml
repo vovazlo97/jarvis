@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    ignore:
+      # Custom forks — do not update automatically
+      - dependency-name: pv_recorder
+      - dependency-name: rustpotter
+    commit-message:
+      prefix: "chore(deps)"

@@ -4,13 +4,14 @@ use structs::RecorderType;
 use structs::SpeechToTextEngine;
 use structs::WakeWordEngine;
 
-use once_cell::sync::Lazy;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 
 use platform_dirs::AppDirs;
 
+#[cfg(feature = "jarvis_app")]
+use once_cell::sync::Lazy;
 #[cfg(feature = "jarvis_app")]
 use rustpotter::{
     AudioFmt, BandPassConfig, DetectorConfig, FiltersConfig, GainNormalizationConfig,

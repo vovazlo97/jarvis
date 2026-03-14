@@ -2,6 +2,8 @@
 
 ![JARVIS Voice Assistant](poster.jpg)
 
+[![CI](https://github.com/vovazlo97/jarvis/actions/workflows/ci.yml/badge.svg)](https://github.com/vovazlo97/jarvis/actions/workflows/ci.yml)
+
 > **100% offline · Open source · No data collection**
 
 A privacy-first voice assistant built with Rust and Tauri. Speak a command — JARVIS hears it, understands it, and acts. No cloud, no subscription, no telemetry.

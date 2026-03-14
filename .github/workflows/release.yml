@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    name: Build Windows release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust (stable, MSVC)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: x86_64-pc-windows-msvc
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Build release binaries
+        run: cargo build --release
+
+      - name: Package artifact
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $artifactName = "jarvis-windows-x64"
+          $artifactDir = "dist-release\$artifactName"
+
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+          # Binaries
+          Copy-Item "target\release\jarvis-app.exe" "$artifactDir\"
+
+          # Native DLLs (Windows-specific runtime libs)
+          Copy-Item "lib\windows\amd64\*.dll" "$artifactDir\" -ErrorAction SilentlyContinue
+          # Also copy root-level libvosk.dll if present
+          if (Test-Path "libvosk.dll") {
+            Copy-Item "libvosk.dll" "$artifactDir\"
+          }
+
+          # Resources (commands, scripts, sound, keywords — not vosk models, too large)
+          $resourceDirs = @("commands", "scripts", "sound", "keywords")
+          foreach ($dir in $resourceDirs) {
+            $src = "resources\$dir"
+            if (Test-Path $src) {
+              Copy-Item $src "$artifactDir\resources\" -Recurse -Force
+            }
+          }
+
+          # Compress
+          Compress-Archive -Path "$artifactDir\*" -DestinationPath "dist-release\$artifactName.zip" -Force
+          Write-Output "ARTIFACT_PATH=dist-release\$artifactName.zip" >> $env:GITHUB_ENV
+          Write-Output "ARTIFACT_NAME=$artifactName.zip" >> $env:GITHUB_ENV
+
+      - name: Extract changelog section for this version
+        id: changelog
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $semver = $version -replace '^v', ''
+          $content = Get-Content CHANGELOG.md -Raw
+          # Extract section between this version header and next header
+          $pattern = "## \[$semver\].*?(?=\n## \[|\z)"
+          $match = [regex]::Match($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
+          if ($match.Success) {
+            $section = $match.Value.Trim()
+          } else {
+            $section = "See CHANGELOG.md for details."
+          }
+          # Write to file to avoid multiline env var issues
+          $section | Out-File -FilePath "release-notes.md" -Encoding utf8
+          Write-Output "RELEASE_NOTES_FILE=release-notes.md" >> $env:GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Jarvis ${{ github.ref_name }}"
+          body_path: ${{ env.RELEASE_NOTES_FILE }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: ${{ env.ARTIFACT_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -48,9 +48,19 @@
 - [x] TASK-025: Configure GitHub MCP server — `claude mcp add github-mcp -- npx -y @modelcontextprotocol/server-github` (2026-03-14)
 - [x] TASK-026: Configure Filesystem MCP server — `claude mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem .` (2026-03-14)
 
+## 🎯 Current Sprint — Phase D: GitOps
+
+### Done
+
+- [x] TASK-030: GitHub Actions CI workflow — fmt, clippy, test-linux (ubuntu), test-windows; CI badge in README.md (2026-03-15)
+- [x] TASK-031: Release workflow — push tag v*.*.* → Windows build → jarvis-windows-x64.zip → GitHub Release via softprops/action-gh-release@v2 (2026-03-15)
+- [x] TASK-032: Branch protection documentation (.github/branch-protection.md) + CODEOWNERS (vovazlo97 owns all files) (2026-03-15)
+- [x] TASK-033: Dependabot for Cargo.toml — weekly Monday, ignore pv_recorder + rustpotter forks, prefix chore(deps) (2026-03-15)
+- [x] TASK-034: CHANGELOG.md — Keep a Changelog format, retrospective v0.1.0..v0.4.0 + Unreleased Phase D (2026-03-15)
+
 ## 📋 Backlog — Phase D: GitOps
 
-_(To be defined)_
+_(All tasks complete — see Done above)_
 
 ## 📋 Backlog — Phase E: Community & Marketplace
 

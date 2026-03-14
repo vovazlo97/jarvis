@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install system audio dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libpulse-dev
+      - uses: Swatinem/rust-cache@v2
+      # Lint only jarvis-core on Linux with --no-default-features.
+      # jarvis-cli depends on jarvis-core with features=["intent"], which uses models::embedding
+      # (only available in jarvis_app feature) → compile error on Linux.
+      # jarvis-cli is linted on Windows where full features are available.
+      - name: Run clippy
+        run: cargo clippy -p jarvis-core --no-default-features -- -D warnings
+
+  test-linux:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install system audio dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libpulse-dev
+      - uses: Swatinem/rust-cache@v2
+      # jarvis-core only: --no-default-features avoids vosk/fastembed download in CI.
+      # jarvis-cli excluded: it activates jarvis-core features=["intent"] which depends on
+      # models::embedding (jarvis_app-only) → compile error without full feature set.
+      # jarvis-app and jarvis-gui excluded: require Windows-only DLLs (libvosk.dll, etc.)
+      - name: Run tests (core only, no native audio features)
+        run: cargo test -p jarvis-core --no-default-features
+
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      # jarvis-gui excluded: Tauri build script requires resources/vosk/ to exist
+      # (large Vosk models are not committed to git — downloaded via setup.ps1 only).
+      # jarvis-core, jarvis-cli, jarvis-app cover all unit-testable logic on Windows.
+      - name: Run tests (core + cli + app, excluding jarvis-gui)
+        run: cargo test -p jarvis-core -p jarvis-cli -p jarvis-app
