@@ -45,8 +45,8 @@
 
 ## 📋 Backlog — Phase C: Skills + MCP
 
-- [ ] TASK-025: Configure GitHub MCP server
-- [ ] TASK-026: Configure Filesystem MCP server
+- [x] TASK-025: Configure GitHub MCP server — `claude mcp add github-mcp -- npx -y @modelcontextprotocol/server-github` (2026-03-14)
+- [x] TASK-026: Configure Filesystem MCP server — `claude mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem .` (2026-03-14)
 
 ## 📋 Backlog — Phase D: GitOps
 

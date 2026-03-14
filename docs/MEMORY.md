@@ -20,7 +20,7 @@
 - **Version:** 0.2.0
 - **Active branch:** feature/phase-c-skills-mcp
 - **Phase:** C — Skills + MCP
-- **Last milestone:** Phase B complete + Phase C skills committed — 5 project skills tracked in git (.claude/skills/), .gitignore updated with skill/rules exceptions (2026-03-14)
+- **Last milestone:** Phase C complete — 5 skills + rules committed to git, GitHub MCP + Filesystem MCP configured in .claude.json (2026-03-14)
 
 ## Known Issues & Technical Debt
 
