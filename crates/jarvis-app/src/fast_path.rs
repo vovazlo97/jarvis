@@ -141,9 +141,6 @@ pub(crate) fn recognize_command(
                     first_recognition = false;
 
                     // filter activation phrases
-                    // for tbr in config::ASSISTANT_PHRASES_TBR {
-                    //     recognized_voice = recognized_voice.replace(tbr, "");
-                    // }
                     for tbr in config::get_phrases_to_remove(&i18n::get_language()) {
                         recognized_voice = recognized_voice.replace(tbr, "");
                     }
@@ -254,9 +251,6 @@ pub(crate) fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
     });
 
     let mut filtered = text.to_lowercase();
-    // for tbr in config::ASSISTANT_PHRASES_TBR {
-    //     filtered = filtered.replace(tbr, "");
-    // }
     for tbr in config::get_phrases_to_remove(&i18n::get_language()) {
         filtered = filtered.replace(tbr, "");
     }
@@ -360,9 +354,9 @@ pub(crate) fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool 
             }
 
             match commands::execute_command(
-                &cmd_path,
-                &cmd_config,
-                Some(&text),
+                cmd_path,
+                cmd_config,
+                Some(text),
                 extracted_slots.as_ref(),
             ) {
                 Ok(chain) => {

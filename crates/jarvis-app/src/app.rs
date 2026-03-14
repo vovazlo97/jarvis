@@ -67,7 +67,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
         }
 
         if let Ok(text) = text_cmd_rx.try_recv() {
-            process_text_command(&text, &rt);
+            process_text_command(&text, rt);
             continue 'wake_word;
         }
 
@@ -133,7 +133,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     ipc::send(IpcEvent::StateChanged {
                         state: AssistantState::Listening,
                     });
-                    recognize_command(&mut frame_buffer, &rt, frame_length, sample_rate, false);
+                    recognize_command(&mut frame_buffer, rt, frame_length, sample_rate, false);
 
                     // Drain speaker echo before re-entering wake word detection.
                     // (Kira is non-blocking; response sounds keep playing after return.)
