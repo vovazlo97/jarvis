@@ -46,6 +46,8 @@ pub mod voices;
 
 pub mod audio_buffer;
 
+pub mod agent_registry;
+pub mod plugin;
 pub mod scripts;
 
 #[cfg(feature = "jarvis_app")]
