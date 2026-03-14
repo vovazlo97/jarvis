@@ -6,8 +6,6 @@ use std::process::Command as Proc;
 
 use crate::{config, APP_DIR};
 
-const SCRIPTS_DIR: &str = "resources/scripts";
-
 // ── Data model ────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -87,39 +85,68 @@ impl Script {
 
 // ── Loading ───────────────────────────────────────────────────────────────────
 
-pub fn parse_scripts() -> Vec<Script> {
-    let dir = scripts_dir();
-    info!("[DEBUG_FIX] parse_scripts() scanning: {:?}", dir);
-    let mut out = Vec::new();
+/// Core merge logic — reads scripts from two directories.
+/// User scripts override bundled scripts with the same `id`.
+/// Missing directories are silently skipped.
+pub fn parse_scripts_from_dirs(
+    bundled_dir: &std::path::Path,
+    user_dir: &std::path::Path,
+) -> Vec<Script> {
+    let mut scripts: std::collections::HashMap<String, Script> = std::collections::HashMap::new();
 
-    let entries = match fs::read_dir(&dir) {
+    load_scripts_from_dir(bundled_dir, &mut scripts);
+
+    if user_dir.exists() {
+        load_scripts_from_dir(user_dir, &mut scripts);
+    }
+
+    let mut result: Vec<Script> = scripts.into_values().collect();
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+    result
+}
+
+fn load_scripts_from_dir(
+    dir: &std::path::Path,
+    out: &mut std::collections::HashMap<String, Script>,
+) {
+    let entries = match fs::read_dir(dir) {
         Ok(e) => e,
-        Err(e) => {
-            info!("[DEBUG_FIX] parse_scripts() dir not accessible: {}", e);
-            return out;
-        }
+        Err(_) => return,
     };
-
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("toml") {
             continue;
         }
-
         match fs::read_to_string(&path) {
             Ok(content) => match toml::from_str::<Script>(&content) {
-                Ok(script) => out.push(script),
+                Ok(script) => {
+                    out.insert(script.id.clone(), script);
+                }
                 Err(e) => warn!("Failed to parse script {}: {}", path.display(), e),
             },
             Err(e) => warn!("Failed to read script {}: {}", path.display(), e),
         }
     }
+}
 
-    out
+pub fn parse_scripts() -> Vec<Script> {
+    let bundled = APP_DIR.join("resources/scripts");
+    let user = config::user_scripts_dir();
+    info!(
+        "[DEBUG_FIX] parse_scripts() scanning bundled: {:?}, user: {:?}",
+        bundled, user
+    );
+    parse_scripts_from_dirs(&bundled, &user)
 }
 
 fn scripts_dir() -> PathBuf {
-    APP_DIR.join(SCRIPTS_DIR)
+    // Falls back to bundled path when APP_CONFIG_DIR is not yet initialised
+    // (e.g. during unit tests that do not call config::init_dirs()).
+    crate::APP_CONFIG_DIR
+        .get()
+        .map(|d| d.join("scripts"))
+        .unwrap_or_else(|| APP_DIR.join("resources/scripts"))
 }
 
 // ── Matching ──────────────────────────────────────────────────────────────────
@@ -381,6 +408,60 @@ pub fn load_script(id: &str) -> Option<Script> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    fn write_script_toml(dir: &std::path::Path, id: &str, name: &str) {
+        let content = format!(
+            "id = \"{}\"\nname = \"{}\"\nmode = \"sequential\"\n",
+            id, name
+        );
+        fs::write(dir.join(format!("{}.toml", id)), content).unwrap();
+    }
+
+    #[test]
+    fn user_script_overrides_bundled_same_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+        fs::create_dir_all(&bundled).unwrap();
+        fs::create_dir_all(&user).unwrap();
+
+        write_script_toml(&bundled, "morning-routine", "Morning Routine (default)");
+        write_script_toml(&user, "morning-routine", "Morning Routine (user)");
+
+        let result = parse_scripts_from_dirs(&bundled, &user);
+        let script = result.iter().find(|s| s.id == "morning-routine").unwrap();
+        assert_eq!(script.name, "Morning Routine (user)");
+    }
+
+    #[test]
+    fn unique_user_script_included() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+        fs::create_dir_all(&bundled).unwrap();
+        fs::create_dir_all(&user).unwrap();
+
+        write_script_toml(&bundled, "default-script", "Default");
+        write_script_toml(&user, "my-script", "My Script");
+
+        let result = parse_scripts_from_dirs(&bundled, &user);
+        let ids: Vec<_> = result.iter().map(|s| s.id.as_str()).collect();
+        assert!(ids.contains(&"my-script"));
+        assert!(ids.contains(&"default-script"));
+    }
+
+    #[test]
+    fn missing_user_scripts_dir_ok() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("nonexistent");
+        fs::create_dir_all(&bundled).unwrap();
+        write_script_toml(&bundled, "s1", "Script 1");
+
+        let result = parse_scripts_from_dirs(&bundled, &user);
+        assert_eq!(result.len(), 1);
+    }
 
     fn make_script(id: &str, phrases_ru: Vec<&str>) -> Script {
         Script {
