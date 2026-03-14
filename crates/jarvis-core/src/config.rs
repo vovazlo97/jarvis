@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use platform_dirs::AppDirs;
 
 #[cfg(feature = "jarvis_app")]
+use once_cell::sync::Lazy;
+#[cfg(feature = "jarvis_app")]
 use rustpotter::{
     AudioFmt, BandPassConfig, DetectorConfig, FiltersConfig, GainNormalizationConfig,
     RustpotterConfig, ScoreMode,
