@@ -78,6 +78,8 @@ fn main() {
             tauri_commands::list_vosk_models,
             // gliner
             tauri_commands::list_gliner_models,
+            // model registry — available backends per task
+            tauri_commands::list_available_models,
             // i18n
             tauri_commands::get_translations,
             tauri_commands::translate,

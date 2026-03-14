@@ -63,6 +63,8 @@ fn load_model_def(toml_path: &Path, model_dir: &Path) -> Result<ModelDef, String
             .to_string());
     }
 
+    // Reached here: either no .onnx (non-ONNX model like Vosk) or real binary → available.
+    def.available = true;
     Ok(def)
 }
 
@@ -86,13 +88,14 @@ struct ModelToml {
     model: ModelDef,
 }
 
-// Code backends per task
+// Code backends per task — always available (no binary required)
 pub fn code_backends(task: Task) -> Vec<BackendOption> {
     match task {
         Task::Intent => vec![BackendOption {
             id: "intent-classifier".into(),
             name: "Intent Classifier".into(),
             model_id: None,
+            available: true,
         }],
         Task::Slots => vec![],
         Task::Vad => vec![
@@ -100,33 +103,40 @@ pub fn code_backends(task: Task) -> Vec<BackendOption> {
                 id: "energy".into(),
                 name: "Energy-based".into(),
                 model_id: None,
+                available: true,
             },
             BackendOption {
                 id: "nnnoiseless".into(),
                 name: "Nnnoiseless".into(),
                 model_id: None,
+                available: true,
             },
         ],
         Task::NoiseSuppression => vec![BackendOption {
             id: "nnnoiseless".into(),
             name: "Nnnoiseless".into(),
             model_id: None,
+            available: true,
         }],
         Task::Stt => vec![BackendOption {
             id: "vosk".into(),
             name: "Vosk".into(),
             model_id: None,
+            available: true,
         }],
     }
 }
 
-// get all available options for a task:
-// "none" first, then code backends, then AI models from catalog
+// get all options for a task:
+// "none" first, then code backends, then AI models from catalog.
+// Each option carries available=true/false so the GUI can distinguish
+// what can actually be used vs what is listed but not downloaded.
 pub fn get_options(task: Task, models: &[ModelDef]) -> Vec<BackendOption> {
     let mut options = vec![BackendOption {
         id: "none".into(),
         name: "Disabled".into(),
         model_id: None,
+        available: true,
     }];
 
     options.extend(code_backends(task));
@@ -137,6 +147,7 @@ pub fn get_options(task: Task, models: &[ModelDef]) -> Vec<BackendOption> {
                 id: model.id.clone(),
                 name: model.name.clone(),
                 model_id: Some(model.id.clone()),
+                available: model.available,
             });
         }
     }
@@ -208,6 +219,69 @@ mod tests {
             models.len(),
             1,
             "scan_models should include models without a .onnx file"
+        );
+    }
+
+    /// ModelDef scanned from a folder with a real binary must have available=true.
+    #[test]
+    fn scan_sets_available_true_for_real_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("real");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+        std::fs::write(model_dir.join("model.onnx"), b"\x08\x07pytorch").unwrap();
+
+        let models = scan_models(dir.path());
+        assert_eq!(models.len(), 1);
+        assert!(
+            models[0].available,
+            "real binary model must be available=true"
+        );
+    }
+
+    /// ModelDef scanned from a folder without .onnx must have available=true
+    /// (non-ONNX models such as Vosk don't have a .onnx file but are still usable).
+    #[test]
+    fn scan_sets_available_true_without_onnx() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("vosk");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+
+        let models = scan_models(dir.path());
+        assert_eq!(models.len(), 1);
+        assert!(
+            models[0].available,
+            "model without onnx must be available=true"
+        );
+    }
+
+    /// get_options must mark "none" and code backends as available=true.
+    /// Model backends must reflect the model's available flag.
+    #[test]
+    fn get_options_propagates_available_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("real-intent");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+        std::fs::write(model_dir.join("model.onnx"), b"\x08\x07pytorch").unwrap();
+
+        let models = scan_models(dir.path());
+        let options = get_options(Task::Intent, &models);
+
+        let none_opt = options.iter().find(|o| o.id == "none").unwrap();
+        assert!(none_opt.available, "'none' option must always be available");
+
+        let code_opt = options
+            .iter()
+            .find(|o| o.id == "intent-classifier")
+            .unwrap();
+        assert!(code_opt.available, "code backend must always be available");
+
+        let model_opt = options.iter().find(|o| o.id == "test-model").unwrap();
+        assert!(
+            model_opt.available,
+            "model with real binary must be available=true"
         );
     }
 }

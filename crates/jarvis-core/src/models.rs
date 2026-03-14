@@ -68,3 +68,15 @@ pub fn get_options(task: Task) -> Vec<BackendOption> {
 pub fn is_valid_backend(task: Task, backend_id: &str) -> bool {
     registry().with_catalog(|models| catalog::is_valid_backend(task, backend_id, models))
 }
+
+/// Returns only the backend options that are actually usable for the given task.
+/// "Disabled" (id="none") and code backends (vosk, energy, intent-classifier) are always included.
+/// Model-based backends are included only when the model binary is present and not an LFS pointer.
+///
+/// Use this for GUI dropdowns — shows only what the user can actually select and use.
+pub fn list_available(task: Task) -> Vec<BackendOption> {
+    get_options(task)
+        .into_iter()
+        .filter(|opt| opt.available)
+        .collect()
+}

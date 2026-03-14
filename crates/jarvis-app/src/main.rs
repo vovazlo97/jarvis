@@ -149,9 +149,9 @@ fn main() -> Result<(), String> {
         }
     });
 
-    // init slots parsing engine
+    // init slots parsing engine — non-critical, warn on failure
     slots::init()
-        .map_err(|e| error!("Slot extraction init failed: {}", e))
+        .map_err(|e| warn!("Slot extraction unavailable: {}", e))
         .ok();
 
     // init audio processing

@@ -13,6 +13,20 @@ use crate::DB;
 
 static BACKEND: OnceCell<String> = OnceCell::new();
 
+/// Universal fallback embedding model — always available as a real binary (not LFS pointer).
+/// Used when the language-preferred model is unavailable.
+const FALLBACK_EMBEDDING_MODEL: &str = "all-MiniLM-L6-v2";
+
+/// Select the preferred embedding model ID for the given language.
+/// For English: lightweight English-only model.
+/// For other languages: multilingual model (may be unavailable if not downloaded).
+fn select_embedding_model_id(lang: &str) -> &'static str {
+    match lang {
+        "en" => "all-MiniLM-L6-v2",
+        _ => "paraphrase-multilingual-MiniLM-L12-v2",
+    }
+}
+
 pub async fn init(commands: &[JCommandsList]) -> Result<(), String> {
     if BACKEND.get().is_some() {
         return Ok(());
@@ -44,16 +58,28 @@ pub async fn init(commands: &[JCommandsList]) -> Result<(), String> {
         }
         // Legacy enum value — auto-select model by language (restores pre-registry behavior)
         "EmbeddingClassifier" => {
-            let model_id = match crate::i18n::get_language().as_str() {
-                "en" => "all-MiniLM-L6-v2",
-                _ => "paraphrase-multilingual-MiniLM-L12-v2",
-            };
+            let lang = crate::i18n::get_language();
+            let preferred = select_embedding_model_id(&lang);
             info!(
-                "EmbeddingClassifier (auto) → model '{}' (language: {}).",
-                model_id,
-                crate::i18n::get_language()
+                "EmbeddingClassifier (auto) → preferred model '{}' (language: {}).",
+                preferred, lang
             );
-            match models::embedding::load(models::registry(), model_id) {
+            // Try preferred model, then fall back to the universal English model
+            // if the preferred one is unavailable (e.g. multilingual LFS pointer not downloaded).
+            let model_result =
+                models::embedding::load(models::registry(), preferred).or_else(|e| {
+                    if preferred != FALLBACK_EMBEDDING_MODEL {
+                        warn!(
+                            "Preferred model '{}' unavailable ({}). \
+                             Trying universal fallback '{}'...",
+                            preferred, e, FALLBACK_EMBEDDING_MODEL
+                        );
+                        models::embedding::load(models::registry(), FALLBACK_EMBEDDING_MODEL)
+                    } else {
+                        Err(e)
+                    }
+                });
+            match model_result {
                 Ok(model) => {
                     embeddingclassifier::init_with_model(model, commands)?;
                     BACKEND.set(backend).map_err(|_| "Backend already set")?;
@@ -138,6 +164,53 @@ pub async fn classify(text: &str) -> Option<(String, f64)> {
                 None
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// select_embedding_model_id must return the lightweight English model for "en".
+    #[test]
+    fn selects_minilm_for_english() {
+        assert_eq!(select_embedding_model_id("en"), "all-MiniLM-L6-v2");
+    }
+
+    /// select_embedding_model_id must return the multilingual model for non-English languages.
+    #[test]
+    fn selects_multilingual_for_russian() {
+        assert_eq!(
+            select_embedding_model_id("ru"),
+            "paraphrase-multilingual-MiniLM-L12-v2"
+        );
+    }
+
+    /// select_embedding_model_id must return the multilingual model for unknown languages.
+    #[test]
+    fn selects_multilingual_for_unknown_lang() {
+        assert_eq!(
+            select_embedding_model_id("xx"),
+            "paraphrase-multilingual-MiniLM-L12-v2"
+        );
+    }
+
+    /// FALLBACK_EMBEDDING_MODEL must be the lightweight English model that is always
+    /// available as a real binary (not an LFS pointer).
+    #[test]
+    fn fallback_model_is_minilm() {
+        assert_eq!(FALLBACK_EMBEDDING_MODEL, "all-MiniLM-L6-v2");
+    }
+
+    /// Fallback must differ from the multilingual preferred model so the
+    /// or_else branch is actually reachable for non-English languages.
+    #[test]
+    fn fallback_differs_from_multilingual() {
+        assert_ne!(
+            FALLBACK_EMBEDDING_MODEL,
+            select_embedding_model_id("ru"),
+            "fallback must be a different model than the Russian preferred model"
+        );
     }
 }
 
