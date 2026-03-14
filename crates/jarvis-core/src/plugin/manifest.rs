@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Permissions a plugin requests at install time.
 /// All default to false (deny-by-default).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PluginPermissions {
     #[serde(default)]
     pub filesystem: bool,
@@ -13,16 +13,6 @@ pub struct PluginPermissions {
     pub network: bool,
     #[serde(default)]
     pub processes: bool,
-}
-
-impl Default for PluginPermissions {
-    fn default() -> Self {
-        Self {
-            filesystem: false,
-            network: false,
-            processes: false,
-        }
-    }
 }
 
 /// Validated plugin manifest loaded from `plugin.json`.

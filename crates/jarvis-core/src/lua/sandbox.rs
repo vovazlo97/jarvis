@@ -1,27 +1,32 @@
 use serde::{Deserialize, Serialize};
 
 // Sandbox level controlling what APIs are available
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SandboxLevel {
     // Minimal: only core APIs (log, speak, audio, context)
     Minimal,
 
     // Standard: + http, state, fs (command folder only)
+    #[default]
     Standard,
 
     // Full: + system.exec, expanded fs access
     Full,
 }
 
-impl SandboxLevel {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
+impl std::str::FromStr for SandboxLevel {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
             "minimal" => SandboxLevel::Minimal,
             "full" => SandboxLevel::Full,
             _ => SandboxLevel::Standard,
-        }
+        })
     }
+}
 
+impl SandboxLevel {
     // Can use HTTP API
     pub fn allows_http(&self) -> bool {
         matches!(self, SandboxLevel::Standard | SandboxLevel::Full)
@@ -55,11 +60,5 @@ impl SandboxLevel {
     // Can access paths outside command folder
     pub fn allows_expanded_paths(&self) -> bool {
         matches!(self, SandboxLevel::Full)
-    }
-}
-
-impl Default for SandboxLevel {
-    fn default() -> Self {
-        SandboxLevel::Standard
     }
 }

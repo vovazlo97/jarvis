@@ -45,10 +45,8 @@ pub fn register(lua: &Lua, jarvis: &Table, sandbox: SandboxLevel) -> mlua::Resul
 
             // add extra args if provided
             if let Some(args_table) = args {
-                for pair in args_table.sequence_values::<String>() {
-                    if let Ok(arg) = pair {
-                        command.arg(arg);
-                    }
+                for arg in args_table.sequence_values::<String>().flatten() {
+                    command.arg(arg);
                 }
             }
 

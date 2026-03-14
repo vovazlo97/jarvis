@@ -9,10 +9,10 @@ use crate::config;
 static RUSTPOTTER: OnceCell<Mutex<Rustpotter>> = OnceCell::new();
 
 pub fn init() -> Result<(), ()> {
-    let rustpotter_config = config::RUSTPOTTER_DEFAULT_CONFIG;
+    let rustpotter_config = &*config::RUSTPOTTER_DEFAULT_CONFIG;
 
     // create rustpotter instance
-    match Rustpotter::new(&rustpotter_config) {
+    match Rustpotter::new(rustpotter_config) {
         Ok(mut rinstance) => {
             // success
             // wake word files list

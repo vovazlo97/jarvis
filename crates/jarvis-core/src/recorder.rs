@@ -10,7 +10,7 @@ use crate::{config, config::structs::RecorderType, DB};
 static RECORDER_TYPE: OnceCell<RecorderType> = OnceCell::new();
 static FRAME_LENGTH: OnceCell<u32> = OnceCell::new();
 
-pub fn init() -> Result<(), ()> {
+pub fn init() -> Result<(), String> {
     // set default recorder type
     // @TODO. Make it configurable?
     RECORDER_TYPE.set(config::DEFAULT_RECORDER_TYPE).unwrap();
@@ -33,7 +33,7 @@ pub fn init() -> Result<(), ()> {
                 false => {
                     error!("Recorder initialization failed.");
 
-                    return Err(());
+                    return Err("Recorder initialization failed".to_string());
                 }
                 _ => {
                     info!(
@@ -89,14 +89,12 @@ pub fn read_microphone(frame_buffer: &mut [i16]) {
     }
 }
 
-pub fn start_recording() -> Result<(), ()> {
+pub fn start_recording() -> Result<(), String> {
     match RECORDER_TYPE.get().unwrap() {
-        RecorderType::PvRecorder => {
-            return pvrecorder::start_recording(
-                get_selected_microphone_index(),
-                FRAME_LENGTH.get().unwrap().to_owned(),
-            );
-        }
+        RecorderType::PvRecorder => pvrecorder::start_recording(
+            get_selected_microphone_index(),
+            FRAME_LENGTH.get().unwrap().to_owned(),
+        ),
         RecorderType::PortAudio => {
             todo!();
             // portaudio::start_recording(get_selected_microphone_index(), FRAME_LENGTH.load(Ordering::SeqCst));
@@ -108,7 +106,7 @@ pub fn start_recording() -> Result<(), ()> {
     }
 }
 
-pub fn stop_recording() -> Result<(), ()> {
+pub fn stop_recording() -> Result<(), String> {
     match RECORDER_TYPE.get().unwrap() {
         RecorderType::PvRecorder => pvrecorder::stop_recording(),
         RecorderType::PortAudio => {

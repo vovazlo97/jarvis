@@ -12,6 +12,12 @@ pub struct ModelRegistry {
     catalog: RwLock<Vec<ModelDef>>,
 }
 
+impl Default for ModelRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ModelRegistry {
     pub fn new() -> Self {
         Self {

@@ -65,7 +65,7 @@ pub fn init(default_voice: &str, language: &str) -> Result<(), String> {
 }
 
 pub fn scan_voices() -> Result<Vec<structs::VoiceConfig>, String> {
-    let voices_dir = SOUND_DIR.join(&config::VOICES_PATH);
+    let voices_dir = SOUND_DIR.join(config::VOICES_PATH);
 
     if !voices_dir.exists() {
         return Err(format!("Voices directory not found: {:?}", voices_dir));

@@ -1,6 +1,5 @@
 use tray_icon::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 
-use jarvis_core::config::structs::{NoiseSuppressionBackend, WakeWordEngine};
 use jarvis_core::{i18n, voices, SettingsManager};
 
 // RADIO GROUP

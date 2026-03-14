@@ -141,7 +141,7 @@ impl LuaEngine {
             .eval::<Value>();
 
         // remove hook
-        let _ = self.lua.remove_hook();
+        self.lua.remove_hook();
 
         // result
         match result {

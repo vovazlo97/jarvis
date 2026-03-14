@@ -279,12 +279,12 @@ pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
-        return Command::new("cmd")
+        Command::new("cmd")
             .arg("/C")
             .arg(cmd)
             .args(args)
             .creation_flags(CREATE_NO_WINDOW)
-            .spawn();
+            .spawn()
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -292,7 +292,7 @@ pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
 }
 
 pub fn execute_command(
-    cmd_path: &PathBuf,
+    cmd_path: &Path,
     cmd_config: &JCommand,
     _phrase: Option<&str>,
     _slots: Option<&HashMap<String, SlotValue>>,
@@ -368,7 +368,7 @@ pub fn execute_command(
         // other
         _ => {
             error!("Command type unknown: {}", cmd_config.cmd_type);
-            Err(format!("Command type unknown: {}", cmd_config.cmd_type).into())
+            Err(format!("Command type unknown: {}", cmd_config.cmd_type))
         }
     }
 }
@@ -394,7 +394,7 @@ pub fn list_paths(commands: &[JCommandsList]) -> Vec<&Path> {
 
 #[cfg(feature = "lua")]
 fn execute_lua_command(
-    cmd_path: &PathBuf,
+    cmd_path: &Path,
     cmd_config: &JCommand,
     phrase: Option<&str>,
     slots: Option<&HashMap<String, SlotValue>>,
@@ -414,15 +414,18 @@ fn execute_lua_command(
     }
 
     // parse sandbox level
-    let sandbox = SandboxLevel::from_str(&cmd_config.sandbox);
+    let sandbox = cmd_config
+        .sandbox
+        .parse::<SandboxLevel>()
+        .unwrap_or_default();
 
     // create context
     let context = CommandContext {
         phrase: phrase.unwrap_or("").to_string(),
         command_id: cmd_config.id.clone(),
-        command_path: cmd_path.clone(),
+        command_path: cmd_path.to_path_buf(),
         language: i18n::get_language(),
-        slots: slots.map(|s| s.clone()),
+        slots: slots.cloned(),
     };
 
     // get timeout

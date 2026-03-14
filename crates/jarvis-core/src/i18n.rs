@@ -1,5 +1,5 @@
 use fluent_bundle::concurrent::FluentBundle as ConcurrentFluentBundle;
-use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
+use fluent_bundle::{FluentArgs, FluentResource, FluentValue};
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use std::collections::HashMap;

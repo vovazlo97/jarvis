@@ -22,14 +22,8 @@ pub struct CommandContext {
 }
 
 // Result returned from Lua script execution
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct CommandResult {
     // Whether to continue chaining commands
     pub chain: bool,
-}
-
-impl Default for CommandResult {
-    fn default() -> Self {
-        Self { chain: false }
-    }
 }

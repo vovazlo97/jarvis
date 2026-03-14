@@ -2,8 +2,8 @@ use tauri::Emitter;
 
 // the payload type must implement `Serialize` and `Clone`.
 #[derive(Clone, serde::Serialize)]
-pub struct Payload {
-    pub data: String,
+struct Payload {
+    data: String,
 }
 
 #[allow(dead_code)]
@@ -17,7 +17,7 @@ pub enum EventTypes {
 }
 
 impl EventTypes {
-    pub fn get(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::AudioPlay => "audio-play",
             Self::AssistantWaiting => "assistant-waiting",
@@ -29,10 +29,11 @@ impl EventTypes {
     }
 }
 
+#[allow(dead_code)]
 pub fn play(phrase: &str, app_handle: &tauri::AppHandle) {
     app_handle
         .emit(
-            EventTypes::AudioPlay.get(),
+            EventTypes::AudioPlay.as_str(),
             Payload {
                 data: phrase.into(),
             },

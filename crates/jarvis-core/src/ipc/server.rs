@@ -15,8 +15,8 @@ pub const IPC_PORT: u16 = 9712;
 pub const IPC_ADDR: &str = "127.0.0.1";
 
 static BROADCAST_TX: OnceCell<broadcast::Sender<IpcEvent>> = OnceCell::new();
-static ACTION_HANDLER: OnceCell<Arc<RwLock<Option<Box<dyn Fn(IpcAction) + Send + Sync>>>>> =
-    OnceCell::new();
+type ActionHandlerFn = Box<dyn Fn(IpcAction) + Send + Sync>;
+static ACTION_HANDLER: OnceCell<Arc<RwLock<Option<ActionHandlerFn>>>> = OnceCell::new();
 
 // Initialize the IPC broadcast channel
 pub fn init() -> broadcast::Sender<IpcEvent> {

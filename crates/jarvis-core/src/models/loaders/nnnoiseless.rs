@@ -11,6 +11,12 @@ pub struct NnnoiselessNS {
     buffer: Vec<f32>,
 }
 
+impl Default for NnnoiselessNS {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NnnoiselessNS {
     pub fn new() -> Self {
         Self {
@@ -61,6 +67,12 @@ impl NnnoiselessNS {
 pub struct NnnoiselessVAD {
     state: Box<DenoiseState<'static>>,
     buffer: Vec<f32>,
+}
+
+impl Default for NnnoiselessVAD {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NnnoiselessVAD {

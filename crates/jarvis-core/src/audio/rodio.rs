@@ -25,7 +25,7 @@ pub fn init() -> Result<(), ()> {
     match rodio::OutputStreamBuilder::open_default_stream() {
         Ok(stream_handle) => {
             // create sink
-            let sink = Sink::connect_new(&stream_handle.mixer());
+            let sink = Sink::connect_new(stream_handle.mixer());
             info!("Sink initialized.");
 
             // store
@@ -45,16 +45,10 @@ pub fn init() -> Result<(), ()> {
     }
 }
 
-/// Rodio calls play_sound() with sleep=true (blocking), so by the time
-/// execute_command() returns, audio is already done. Always false.
-pub fn is_playing() -> bool {
-    false
-}
-
 pub fn play_sound(filename: &PathBuf, sleep: bool) {
     // Load a sound from a file, using a path relative to Cargo.toml
     // let filepath = format!("{PUBLIC_PATH}/sound/{filename}.wav");
-    let file = BufReader::new(File::open(&filename).unwrap());
+    let file = BufReader::new(File::open(filename).unwrap());
 
     // Decode that sound file into a source
     let source = Decoder::new(file).unwrap();

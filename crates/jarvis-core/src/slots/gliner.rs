@@ -323,12 +323,12 @@ pub fn extract(
 
     debug!("GLiNER extract: text='{}', labels={:?}", text, labels);
 
-    let words = split_words(text, &model, Some(MAX_LENGTH));
+    let words = split_words(text, model, Some(MAX_LENGTH));
     if words.is_empty() {
         return Ok(HashMap::new());
     }
 
-    let encoded = encode_single(&model, &labels, &words)?;
+    let encoded = encode_single(model, &labels, &words)?;
 
     let (span_idx, span_mask) = make_span_tensors(encoded.num_words, MAX_WIDTH);
 
