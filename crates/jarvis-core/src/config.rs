@@ -4,7 +4,6 @@ use structs::RecorderType;
 use structs::SpeechToTextEngine;
 use structs::WakeWordEngine;
 
-use once_cell::sync::Lazy;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
