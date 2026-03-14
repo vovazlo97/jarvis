@@ -1,0 +1,5 @@
+[model]
+id = "all-MiniLM-L6-v2"
+name = "all-MiniLM-L6-v2 (English)"
+tasks = ["intent"]
+description = "Lightweight English sentence embedding model for intent classification"

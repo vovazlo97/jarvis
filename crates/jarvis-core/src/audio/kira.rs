@@ -1,7 +1,7 @@
 use once_cell::sync::OnceCell;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // Unix timestamp (ms) when the last scheduled audio playback is expected to end.
@@ -14,8 +14,7 @@ static PLAYBACK_ENDS_AT_MS: AtomicU64 = AtomicU64::new(0);
 // };
 
 use kira::{
-    AudioManager, AudioManagerSettings, DefaultBackend,
-    sound::static_sound::StaticSoundData,
+    sound::static_sound::StaticSoundData, AudioManager, AudioManagerSettings, DefaultBackend,
 };
 
 static MANAGER: OnceCell<Mutex<AudioManager>> = OnceCell::new();
@@ -23,7 +22,7 @@ static MANAGER: OnceCell<Mutex<AudioManager>> = OnceCell::new();
 pub fn init() -> Result<(), ()> {
     if MANAGER.get().is_some() {
         return Ok(());
-    }  // already initialized
+    } // already initialized
 
     // Create an audio manager. This plays sounds and manages resources.
     match AudioManager::<DefaultBackend>::new(AudioManagerSettings::default()) {
@@ -83,7 +82,11 @@ pub fn play_sound(filename: &PathBuf) {
             }
         }
         Err(err) => {
-            warn!("Cannot find sound file: {} (err: {})", filename.display(), err);
+            warn!(
+                "Cannot find sound file: {} (err: {})",
+                filename.display(),
+                err
+            );
         }
     }
 }

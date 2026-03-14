@@ -115,6 +115,9 @@
                 await invoke("append_command_to_pack", { packName: effectivePack, command: payload })
                 flashCmd(`Command "${cmdForm.id}" added`)
             }
+            // Hot-reload: push changes to running jarvis-app without restart.
+            // Silently ignored if jarvis-app is not running.
+            invoke("reload_jarvis_commands").catch(() => {/* jarvis-app may not be running */})
             closeCmdModal(); await loadPacks()
         } catch (e) { cmdForm.formError = String(e) }
         saving = false
@@ -125,7 +128,11 @@
             deletePackTarget = name; setTimeout(() => { deletePackTarget = "" }, 3000); return
         }
         deletePackTarget = ""
-        try { await invoke("delete_command_pack", { packName: name }); await loadPacks() }
+        try {
+            await invoke("delete_command_pack", { packName: name })
+            invoke("reload_jarvis_commands").catch(() => {/* jarvis-app may not be running */})
+            await loadPacks()
+        }
         catch (e) { cmdError = String(e) }
     }
 
@@ -134,7 +141,11 @@
             deleteCmdTarget = { pack, id }; setTimeout(() => { deleteCmdTarget = null }, 3000); return
         }
         deleteCmdTarget = null
-        try { await invoke("delete_command", { packName: pack, commandId: id }); await loadPacks() }
+        try {
+            await invoke("delete_command", { packName: pack, commandId: id })
+            invoke("reload_jarvis_commands").catch(() => {/* jarvis-app may not be running */})
+            await loadPacks()
+        }
         catch (e) { cmdError = String(e) }
     }
 

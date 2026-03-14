@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use platform_dirs::AppDirs;
 
-#[cfg(feature="jarvis_app")]
+#[cfg(feature = "jarvis_app")]
 use rustpotter::{
     AudioFmt, BandPassConfig, DetectorConfig, FiltersConfig, GainNormalizationConfig,
     RustpotterConfig, ScoreMode,
@@ -96,7 +96,7 @@ pub const TRAY_TOOLTIP: &str = "Jarvis Voice Assistant";
 // RUSPOTTER
 pub const RUSPOTTER_MIN_SCORE: f32 = 0.62;
 
-#[cfg(feature="jarvis_app")]
+#[cfg(feature = "jarvis_app")]
 pub const RUSTPOTTER_DEFAULT_CONFIG: Lazy<RustpotterConfig> = Lazy::new(|| {
     RustpotterConfig {
         fmt: AudioFmt::default(),
@@ -161,7 +161,6 @@ pub const VOSK_SPEECH_PARTIAL_WORDS: bool = false;
 // 0.88 requires near-exact intent match; weak guesses fall through to not_found.
 pub const INTENT_CLASSIFIER_MIN_CONFIDENCE: f64 = 0.88;
 
-
 // embedding classifier
 pub const EMBEDDING_MIN_CONFIDENCE: f64 = 0.80;
 
@@ -170,14 +169,14 @@ pub const DEFAULT_NOISE_SUPPRESSION: NoiseSuppressionBackend = NoiseSuppressionB
 pub const DEFAULT_GAIN_NORMALIZER: bool = false;
 
 // VAD settings
-pub const VAD_ENERGY_THRESHOLD: f32 = 30.0;  // RMS threshold for energy-based VAD (lowered for quiet mics / Windows AGC)
-pub const VAD_NNNOISELESS_THRESHOLD: f32 = 0.8;  // probability threshold for nnnoiseless
-pub const VAD_SILENCE_FRAMES: u32 = 15;  // frames of silence before speech end (~480ms)
+pub const VAD_ENERGY_THRESHOLD: f32 = 30.0; // RMS threshold for energy-based VAD (lowered for quiet mics / Windows AGC)
+pub const VAD_NNNOISELESS_THRESHOLD: f32 = 0.8; // probability threshold for nnnoiseless
+pub const VAD_SILENCE_FRAMES: u32 = 15; // frames of silence before speech end (~480ms)
 
 // gain normalizer settings
-pub const GAIN_TARGET_RMS: f32 = 3000.0;  // target RMS level
-pub const GAIN_MIN: f32 = 0.5;  // minimum gain multiplier
-pub const GAIN_MAX: f32 = 3.0;  // maximum gain multiplier
+pub const GAIN_TARGET_RMS: f32 = 3000.0; // target RMS level
+pub const GAIN_MIN: f32 = 0.5; // minimum gain multiplier
+pub const GAIN_MAX: f32 = 3.0; // maximum gain multiplier
 
 // nnnoiseless frame size (fixed by library)
 pub const NNNOISELESS_FRAME_SIZE: usize = 480;
@@ -215,7 +214,25 @@ pub const CMS_WAIT_DELAY: std::time::Duration = std::time::Duration::from_secs(1
 //     "очень тонкое замечание сэр",
 // ];
 
+/// Returns the directory where user-created command packs are stored.
+/// Persistent across builds and updates.
+/// Windows: %APPDATA%\com.priler.jarvis\commands\
+pub fn user_commands_dir() -> std::path::PathBuf {
+    crate::APP_CONFIG_DIR
+        .get()
+        .expect("config::init_dirs() must be called before user_commands_dir()")
+        .join("commands")
+}
 
+/// Returns the directory where user-created scripts are stored.
+/// Persistent across builds and updates.
+/// Windows: %APPDATA%\com.priler.jarvis\scripts\
+pub fn user_scripts_dir() -> std::path::PathBuf {
+    crate::APP_CONFIG_DIR
+        .get()
+        .expect("config::init_dirs() must be called before user_scripts_dir()")
+        .join("scripts")
+}
 
 pub fn get_wake_phrases(lang: &str) -> &'static [&'static str] {
     match lang {
@@ -229,19 +246,47 @@ pub fn get_wake_phrases(lang: &str) -> &'static [&'static str] {
 pub fn get_phrases_to_remove(lang: &str) -> &'static [&'static str] {
     match lang {
         "ru" => &[
-            "джарвис", "джервис", "гарвис", "джарви", "гарви",
-            "сэр", "слушаю сэр", "всегда к услугам",
-            "произнеси", "ответь", "покажи", "скажи", "давай",
-            "да сэр", "к вашим услугам сэр", "загружаю сэр",
+            "джарвис",
+            "джервис",
+            "гарвис",
+            "джарви",
+            "гарви",
+            "сэр",
+            "слушаю сэр",
+            "всегда к услугам",
+            "произнеси",
+            "ответь",
+            "покажи",
+            "скажи",
+            "давай",
+            "да сэр",
+            "к вашим услугам сэр",
+            "загружаю сэр",
         ],
         "ua" => &[
-            "джарвіс", "джервіс", "сер", "слухаю сер", "завжди до послуг",
-            "скажи", "покажи", "відповідай", "давай",
-            "так сер", "до ваших послуг сер",
+            "джарвіс",
+            "джервіс",
+            "сер",
+            "слухаю сер",
+            "завжди до послуг",
+            "скажи",
+            "покажи",
+            "відповідай",
+            "давай",
+            "так сер",
+            "до ваших послуг сер",
         ],
         "en" => &[
-            "jarvis", "jervis", "sir", "yes sir", "at your service",
-            "please", "say", "show", "tell", "hey",
+            "jarvis",
+            "jervis",
+            "sir",
+            "yes sir",
+            "at your service",
+            "please",
+            "say",
+            "show",
+            "tell",
+            "hey",
         ],
         _ => &["jarvis"],
     }
@@ -250,16 +295,26 @@ pub fn get_phrases_to_remove(lang: &str) -> &'static [&'static str] {
 pub fn get_wake_grammar(lang: &str) -> &'static [&'static str] {
     match lang {
         "ru" => &[
-            "джарвис", "[unk]", "джон", "джони", "джей",
-            "джонстон", "привет", "давай",
+            "джарвис",
+            "[unk]",
+            "джон",
+            "джони",
+            "джей",
+            "джонстон",
+            "привет",
+            "давай",
         ],
         "ua" => &[
-            "джарвіс", "[unk]", "джон", "джоні", "джей",
-            "привіт", "давай",
+            "джарвіс",
+            "[unk]",
+            "джон",
+            "джоні",
+            "джей",
+            "привіт",
+            "давай",
         ],
         "en" => &[
-            "jarvis", "[unk]", "john", "johnny", "jay",
-            "hello", "hey", "hi",
+            "jarvis", "[unk]", "john", "johnny", "jay", "hello", "hey", "hi",
         ],
         _ => &["jarvis", "[unk]"],
     }

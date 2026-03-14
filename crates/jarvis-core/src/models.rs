@@ -1,10 +1,10 @@
-mod registry;
 mod catalog;
-pub mod structs;
 pub mod loaders;
+mod registry;
+pub mod structs;
 
-pub mod vosk_models;
 pub mod gliner_models;
+pub mod vosk_models;
 
 // re-export loaders
 #[cfg(feature = "jarvis_app")]
@@ -26,7 +26,7 @@ pub use loaders::vosk;
 pub use loaders::nnnoiseless;
 
 pub use registry::ModelRegistry;
-pub use structs::{Task, ModelDef, BackendOption};
+pub use structs::{BackendOption, ModelDef, Task};
 
 use once_cell::sync::OnceCell;
 
@@ -48,14 +48,17 @@ pub fn init() -> Result<(), String> {
     info!("Found {} model(s) in {:?}", models.len(), models_dir);
     registry.set_catalog(models);
 
-    REGISTRY.set(registry)
+    REGISTRY
+        .set(registry)
         .map_err(|_| "Models registry already initialized".to_string())?;
 
     Ok(())
 }
 
 pub fn registry() -> &'static ModelRegistry {
-    REGISTRY.get().expect("Models registry not initialized - call models::init() first")
+    REGISTRY
+        .get()
+        .expect("Models registry not initialized - call models::init() first")
 }
 
 pub fn get_options(task: Task) -> Vec<BackendOption> {
@@ -64,4 +67,16 @@ pub fn get_options(task: Task) -> Vec<BackendOption> {
 
 pub fn is_valid_backend(task: Task, backend_id: &str) -> bool {
     registry().with_catalog(|models| catalog::is_valid_backend(task, backend_id, models))
+}
+
+/// Returns only the backend options that are actually usable for the given task.
+/// "Disabled" (id="none") and code backends (vosk, energy, intent-classifier) are always included.
+/// Model-based backends are included only when the model binary is present and not an LFS pointer.
+///
+/// Use this for GUI dropdowns — shows only what the user can actually select and use.
+pub fn list_available(task: Task) -> Vec<BackendOption> {
+    get_options(task)
+        .into_iter()
+        .filter(|opt| opt.available)
+        .collect()
 }

@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// High-level assistant state for GUI and IPC consumers.
 /// Separate from VadState (low-level audio VAD) in jarvis-app.

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use super::structs::{Task, ModelDef, BackendOption};
+use super::structs::{BackendOption, ModelDef, Task};
 
 // scan the models directory for folders containing model.toml
 pub fn scan_models(models_dir: &Path) -> Vec<ModelDef> {
@@ -33,7 +33,10 @@ pub fn scan_models(models_dir: &Path) -> Vec<ModelDef> {
 
         match load_model_def(&toml_path, &path) {
             Ok(def) => {
-                info!("Found model: {} ({}) - tasks: {:?}", def.name, def.id, def.tasks);
+                info!(
+                    "Found model: {} ({}) - tasks: {:?}",
+                    def.name, def.id, def.tasks
+                );
                 models.push(def);
             }
             Err(e) => warn!("Failed to load model from {:?}: {}", path, e),
@@ -44,16 +47,40 @@ pub fn scan_models(models_dir: &Path) -> Vec<ModelDef> {
 }
 
 fn load_model_def(toml_path: &Path, model_dir: &Path) -> Result<ModelDef, String> {
-    let content = fs::read_to_string(toml_path)
-        .map_err(|e| format!("read error: {}", e))?;
+    let content = fs::read_to_string(toml_path).map_err(|e| format!("read error: {}", e))?;
 
-    let parsed: ModelToml = toml::from_str(&content)
-        .map_err(|e| format!("parse error: {}", e))?;
+    let parsed: ModelToml = toml::from_str(&content).map_err(|e| format!("parse error: {}", e))?;
 
     let mut def = parsed.model;
     def.path = model_dir.to_path_buf();
 
+    // Reject models whose primary binary is a Git LFS pointer — the file has not
+    // been downloaded yet and will fail to parse as ONNX/protobuf at load time.
+    let onnx_path = model_dir.join("model.onnx");
+    if onnx_path.exists() && is_lfs_pointer(&onnx_path) {
+        return Err("model.onnx is a Git LFS pointer (binary not downloaded). \
+             Run `git lfs pull` to download the actual model file."
+            .to_string());
+    }
+
+    // Reached here: either no .onnx (non-ONNX model like Vosk) or real binary → available.
+    def.available = true;
     Ok(def)
+}
+
+/// Returns true if the file starts with the Git LFS pointer magic prefix.
+/// Reads only the first 23 bytes — avoids loading large model binaries.
+fn is_lfs_pointer(path: &Path) -> bool {
+    use std::io::Read;
+    const LFS_MAGIC: &[u8] = b"version https://git-lfs";
+    let mut buf = [0u8; 23];
+    match fs::File::open(path) {
+        Ok(mut f) => {
+            let n = f.read(&mut buf).unwrap_or(0);
+            &buf[..n] == LFS_MAGIC
+        }
+        Err(_) => false,
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -61,56 +88,56 @@ struct ModelToml {
     model: ModelDef,
 }
 
-// Code backends per task
+// Code backends per task — always available (no binary required)
 pub fn code_backends(task: Task) -> Vec<BackendOption> {
     match task {
-        Task::Intent => vec![
-            BackendOption {
-                id: "intent-classifier".into(),
-                name: "Intent Classifier".into(),
-                model_id: None,
-            },
-        ],
+        Task::Intent => vec![BackendOption {
+            id: "intent-classifier".into(),
+            name: "Intent Classifier".into(),
+            model_id: None,
+            available: true,
+        }],
         Task::Slots => vec![],
         Task::Vad => vec![
             BackendOption {
                 id: "energy".into(),
                 name: "Energy-based".into(),
                 model_id: None,
+                available: true,
             },
             BackendOption {
                 id: "nnnoiseless".into(),
                 name: "Nnnoiseless".into(),
                 model_id: None,
+                available: true,
             },
         ],
-        Task::NoiseSuppression => vec![
-            BackendOption {
-                id: "nnnoiseless".into(),
-                name: "Nnnoiseless".into(),
-                model_id: None,
-            },
-        ],
-        Task::Stt => vec![
-            BackendOption {
-                id: "vosk".into(),
-                name: "Vosk".into(),
-                model_id: None,
-            },
-        ],
+        Task::NoiseSuppression => vec![BackendOption {
+            id: "nnnoiseless".into(),
+            name: "Nnnoiseless".into(),
+            model_id: None,
+            available: true,
+        }],
+        Task::Stt => vec![BackendOption {
+            id: "vosk".into(),
+            name: "Vosk".into(),
+            model_id: None,
+            available: true,
+        }],
     }
 }
 
-// get all available options for a task:
-// "none" first, then code backends, then AI models from catalog
+// get all options for a task:
+// "none" first, then code backends, then AI models from catalog.
+// Each option carries available=true/false so the GUI can distinguish
+// what can actually be used vs what is listed but not downloaded.
 pub fn get_options(task: Task, models: &[ModelDef]) -> Vec<BackendOption> {
-    let mut options = vec![
-        BackendOption {
-            id: "none".into(),
-            name: "Disabled".into(),
-            model_id: None,
-        },
-    ];
+    let mut options = vec![BackendOption {
+        id: "none".into(),
+        name: "Disabled".into(),
+        model_id: None,
+        available: true,
+    }];
 
     options.extend(code_backends(task));
 
@@ -120,11 +147,143 @@ pub fn get_options(task: Task, models: &[ModelDef]) -> Vec<BackendOption> {
                 id: model.id.clone(),
                 name: model.name.clone(),
                 model_id: Some(model.id.clone()),
+                available: model.available,
             });
         }
     }
 
     options
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn write_model_toml(dir: &std::path::Path) {
+        let toml = "[model]\nid = \"test-model\"\nname = \"Test\"\ntasks = [\"intent\"]\n";
+        std::fs::write(dir.join("model.toml"), toml).unwrap();
+    }
+
+    /// scan_models must skip a model whose model.onnx is a Git LFS pointer.
+    #[test]
+    fn scan_models_skips_lfs_pointer_onnx() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("lfs-model");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+        // write an LFS pointer instead of a real binary
+        std::fs::write(
+            model_dir.join("model.onnx"),
+            b"version https://git-lfs.github.com/spec/v1\noid sha256:abc123\nsize 235052644\n",
+        )
+        .unwrap();
+
+        let models = scan_models(dir.path());
+        assert!(
+            models.is_empty(),
+            "scan_models should exclude models with LFS pointer onnx files, got: {:?}",
+            models.iter().map(|m| &m.id).collect::<Vec<_>>()
+        );
+    }
+
+    /// scan_models must include a model whose model.onnx starts with real binary bytes.
+    #[test]
+    fn scan_models_includes_real_onnx() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("real-model");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+        // write a fake "real" binary (starts with non-LFS bytes)
+        std::fs::write(model_dir.join("model.onnx"), b"\x08\x07\x12\x07pytorch").unwrap();
+
+        let models = scan_models(dir.path());
+        assert_eq!(
+            models.len(),
+            1,
+            "scan_models should include model with real onnx binary"
+        );
+        assert_eq!(models[0].id, "test-model");
+    }
+
+    /// scan_models must include a model that has no model.onnx at all
+    /// (non-embedding models like vosk do not have .onnx files).
+    #[test]
+    fn scan_models_includes_model_without_onnx() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("vosk-model");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+        // no model.onnx — should not be filtered
+
+        let models = scan_models(dir.path());
+        assert_eq!(
+            models.len(),
+            1,
+            "scan_models should include models without a .onnx file"
+        );
+    }
+
+    /// ModelDef scanned from a folder with a real binary must have available=true.
+    #[test]
+    fn scan_sets_available_true_for_real_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("real");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+        std::fs::write(model_dir.join("model.onnx"), b"\x08\x07pytorch").unwrap();
+
+        let models = scan_models(dir.path());
+        assert_eq!(models.len(), 1);
+        assert!(
+            models[0].available,
+            "real binary model must be available=true"
+        );
+    }
+
+    /// ModelDef scanned from a folder without .onnx must have available=true
+    /// (non-ONNX models such as Vosk don't have a .onnx file but are still usable).
+    #[test]
+    fn scan_sets_available_true_without_onnx() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("vosk");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+
+        let models = scan_models(dir.path());
+        assert_eq!(models.len(), 1);
+        assert!(
+            models[0].available,
+            "model without onnx must be available=true"
+        );
+    }
+
+    /// get_options must mark "none" and code backends as available=true.
+    /// Model backends must reflect the model's available flag.
+    #[test]
+    fn get_options_propagates_available_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let model_dir = dir.path().join("real-intent");
+        std::fs::create_dir_all(&model_dir).unwrap();
+        write_model_toml(&model_dir);
+        std::fs::write(model_dir.join("model.onnx"), b"\x08\x07pytorch").unwrap();
+
+        let models = scan_models(dir.path());
+        let options = get_options(Task::Intent, &models);
+
+        let none_opt = options.iter().find(|o| o.id == "none").unwrap();
+        assert!(none_opt.available, "'none' option must always be available");
+
+        let code_opt = options
+            .iter()
+            .find(|o| o.id == "intent-classifier")
+            .unwrap();
+        assert!(code_opt.available, "code backend must always be available");
+
+        let model_opt = options.iter().find(|o| o.id == "test-model").unwrap();
+        assert!(
+            model_opt.available,
+            "model with real binary must be available=true"
+        );
+    }
 }
 
 pub fn is_valid_backend(task: Task, backend_id: &str, models: &[ModelDef]) -> bool {
@@ -136,5 +295,7 @@ pub fn is_valid_backend(task: Task, backend_id: &str, models: &[ModelDef]) -> bo
         return true;
     }
 
-    models.iter().any(|m| m.id == backend_id && m.tasks.contains(&task))
+    models
+        .iter()
+        .any(|m| m.id == backend_id && m.tasks.contains(&task))
 }

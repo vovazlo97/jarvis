@@ -1,43 +1,55 @@
+use seqdiff::ratio;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command as Proc;
-use serde::{Deserialize, Serialize};
-use seqdiff::ratio;
 
 use crate::{config, APP_DIR};
-
-const SCRIPTS_DIR: &str = "resources/scripts";
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ScriptStep {
-    pub step_type: String,   // "command_ref" | "delay" | "custom"
-    #[serde(default)] pub label: String,
+    pub step_type: String, // "command_ref" | "delay" | "custom"
+    #[serde(default)]
+    pub label: String,
     // command_ref
-    #[serde(default)] pub pack: String,
-    #[serde(default)] pub command_id: String,
+    #[serde(default)]
+    pub pack: String,
+    #[serde(default)]
+    pub command_id: String,
     // delay
-    #[serde(default)] pub delay_ms: u64,
+    #[serde(default)]
+    pub delay_ms: u64,
     // custom
-    #[serde(default)] pub cli_cmd: String,
-    #[serde(default)] pub cli_args: Vec<String>,
+    #[serde(default)]
+    pub cli_cmd: String,
+    #[serde(default)]
+    pub cli_args: Vec<String>,
     // spotify
-    #[serde(default)] pub spotify_action: String,
-    #[serde(default)] pub spotify_track_id: String,
+    #[serde(default)]
+    pub spotify_action: String,
+    #[serde(default)]
+    pub spotify_track_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Script {
     pub id: String,
     pub name: String,
-    #[serde(default)] pub description: String,
-    pub mode: String,              // "sequential" | "parallel"
-    #[serde(default)] pub steps: Vec<ScriptStep>,
-    #[serde(default)] pub phrases_ru: Vec<String>,
-    #[serde(default)] pub phrases_en: Vec<String>,
-    #[serde(default)] pub patterns: Vec<String>,
-    #[serde(default)] pub sounds_ru: Vec<String>,
+    #[serde(default)]
+    pub description: String,
+    pub mode: String, // "sequential" | "parallel"
+    #[serde(default)]
+    pub steps: Vec<ScriptStep>,
+    #[serde(default)]
+    pub phrases_ru: Vec<String>,
+    #[serde(default)]
+    pub phrases_en: Vec<String>,
+    #[serde(default)]
+    pub patterns: Vec<String>,
+    #[serde(default)]
+    pub sounds_ru: Vec<String>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub response_sound: String,
 }
@@ -48,7 +60,7 @@ impl Script {
         let specific: Vec<&str> = match lang {
             "ru" => self.phrases_ru.iter().map(|s| s.as_str()).collect(),
             "en" => self.phrases_en.iter().map(|s| s.as_str()).collect(),
-            _    => vec![],
+            _ => vec![],
         };
         if specific.is_empty() {
             self.phrases_ru.iter().map(|s| s.as_str()).collect()
@@ -73,37 +85,71 @@ impl Script {
 
 // ── Loading ───────────────────────────────────────────────────────────────────
 
-pub fn parse_scripts() -> Vec<Script> {
-    let dir = scripts_dir();
-    info!("[DEBUG_FIX] parse_scripts() scanning: {:?}", dir);
-    let mut out = Vec::new();
+/// Core merge logic — reads scripts from two directories.
+/// User scripts override bundled scripts with the same `id`.
+/// Missing directories are silently skipped.
+pub fn parse_scripts_from_dirs(
+    bundled_dir: &std::path::Path,
+    user_dir: &std::path::Path,
+) -> Vec<Script> {
+    let mut scripts: std::collections::HashMap<String, Script> = std::collections::HashMap::new();
 
-    let entries = match fs::read_dir(&dir) {
-        Ok(e)  => e,
-        Err(e) => {
-            info!("[DEBUG_FIX] parse_scripts() dir not accessible: {}", e);
-            return out;
-        }
+    load_scripts_from_dir(bundled_dir, &mut scripts);
+
+    if user_dir.exists() {
+        load_scripts_from_dir(user_dir, &mut scripts);
+    }
+
+    let mut result: Vec<Script> = scripts.into_values().collect();
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+    result
+}
+
+fn load_scripts_from_dir(
+    dir: &std::path::Path,
+    out: &mut std::collections::HashMap<String, Script>,
+) {
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
     };
-
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("toml") { continue; }
-
+        if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+            continue;
+        }
         match fs::read_to_string(&path) {
             Ok(content) => match toml::from_str::<Script>(&content) {
-                Ok(script) => out.push(script),
+                Ok(script) => {
+                    out.insert(script.id.clone(), script);
+                }
                 Err(e) => warn!("Failed to parse script {}: {}", path.display(), e),
             },
             Err(e) => warn!("Failed to read script {}: {}", path.display(), e),
         }
     }
+}
 
-    out
+pub fn parse_scripts() -> Vec<Script> {
+    let bundled = APP_DIR.join("resources/scripts");
+    let user = crate::APP_CONFIG_DIR
+        .get()
+        .map(|d| d.join("scripts"))
+        .unwrap_or_else(|| APP_DIR.join("resources/scripts"));
+    info!(
+        "parse_scripts() scanning bundled: {:?}, user: {:?}",
+        bundled, user
+    );
+    parse_scripts_from_dirs(&bundled, &user)
 }
 
 fn scripts_dir() -> PathBuf {
-    APP_DIR.join(SCRIPTS_DIR)
+    // Falls back to bundled path when APP_CONFIG_DIR is not yet initialised
+    // (e.g. during unit tests that do not call config::init_dirs()).
+    crate::APP_CONFIG_DIR
+        .get()
+        .map(|d| d.join("scripts"))
+        .unwrap_or_else(|| APP_DIR.join("resources/scripts"))
 }
 
 // ── Matching ──────────────────────────────────────────────────────────────────
@@ -112,7 +158,9 @@ fn scripts_dir() -> PathBuf {
 /// Mirrors the logic of `commands::fetch_command`.
 pub fn fetch_script<'a>(phrase: &str, scripts: &'a [Script]) -> Option<&'a Script> {
     let phrase = phrase.trim().to_lowercase();
-    if phrase.is_empty() { return None; }
+    if phrase.is_empty() {
+        return None;
+    }
 
     // ── 1. Regex pass ──────────────────────────────────────────────────────────
     #[cfg(feature = "regex")]
@@ -123,12 +171,17 @@ pub fn fetch_script<'a>(phrase: &str, scripts: &'a [Script]) -> Option<&'a Scrip
                 match Regex::new(pattern) {
                     Ok(re) => {
                         if re.is_match(&phrase) {
-                            info!("Script regex match: '{}' -> '{}' (pattern: '{}')",
-                                  phrase, script.id, pattern);
+                            info!(
+                                "Script regex match: '{}' -> '{}' (pattern: '{}')",
+                                phrase, script.id, pattern
+                            );
                             return Some(script);
                         }
                     }
-                    Err(e) => warn!("Invalid script regex '{}' in '{}': {}", pattern, script.id, e),
+                    Err(e) => warn!(
+                        "Invalid script regex '{}' in '{}': {}",
+                        pattern, script.id, e
+                    ),
                 }
             }
         }
@@ -174,31 +227,55 @@ pub fn fetch_script<'a>(phrase: &str, scripts: &'a [Script]) -> Option<&'a Scrip
     }
 
     if let Some(s) = best_script {
-        info!("Script fuzzy match: '{}' -> '{}' (score: {:.1}%)", phrase, s.id, best_score);
+        info!(
+            "Script fuzzy match: '{}' -> '{}' (score: {:.1}%)",
+            phrase, s.id, best_score
+        );
     } else {
-        debug!("No script match for '{}' (best: {:.1}%)", phrase, best_score);
+        debug!(
+            "No script match for '{}' (best: {:.1}%)",
+            phrase, best_score
+        );
     }
 
     best_script
 }
 
 fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
-    if input_words.is_empty() || cmd_words.is_empty() { return 0.0; }
+    if input_words.is_empty() || cmd_words.is_empty() {
+        return 0.0;
+    }
     let input_chars: Vec<Vec<char>> = input_words.iter().map(|w| w.chars().collect()).collect();
-    let cmd_chars:   Vec<Vec<char>> = cmd_words.iter().map(|w| w.chars().collect()).collect();
+    let cmd_chars: Vec<Vec<char>> = cmd_words.iter().map(|w| w.chars().collect()).collect();
 
     // How well is the TRIGGER covered by the input? (prevent 2-word trigger matching any long phrase)
-    let trigger_coverage: f64 = cmd_chars.iter().map(|cw| {
-        input_chars.iter().map(|iw| ratio(iw, cw)).fold(0.0_f64, f64::max)
-    }).sum::<f64>() / cmd_words.len() as f64;
+    let trigger_coverage: f64 = cmd_chars
+        .iter()
+        .map(|cw| {
+            input_chars
+                .iter()
+                .map(|iw| ratio(iw, cw))
+                .fold(0.0_f64, f64::max)
+        })
+        .sum::<f64>()
+        / cmd_words.len() as f64;
 
     // How well is the INPUT covered by the trigger? (penalise very long inputs)
-    let input_coverage: f64 = input_chars.iter().map(|iw| {
-        cmd_chars.iter().map(|cw| ratio(iw, cw)).fold(0.0_f64, f64::max)
-    }).sum::<f64>() / input_words.len() as f64;
+    let input_coverage: f64 = input_chars
+        .iter()
+        .map(|iw| {
+            cmd_chars
+                .iter()
+                .map(|cw| ratio(iw, cw))
+                .fold(0.0_f64, f64::max)
+        })
+        .sum::<f64>()
+        / input_words.len() as f64;
 
     // Use the harmonic mean — both sides must match well
-    if trigger_coverage + input_coverage < 1e-9 { return 0.0; }
+    if trigger_coverage + input_coverage < 1e-9 {
+        return 0.0;
+    }
     // ratio() already returns 0-100, so harmonic mean is already in 0-100 range — no extra scaling needed
     2.0 * trigger_coverage * input_coverage / (trigger_coverage + input_coverage)
 }
@@ -210,7 +287,7 @@ fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
 pub fn execute_script(script: &Script) -> Result<(), String> {
     match script.mode.as_str() {
         "parallel" => run_parallel(script.steps.clone()),
-        _          => run_sequential(&script.steps),
+        _ => run_sequential(&script.steps),
     }
 }
 
@@ -223,10 +300,17 @@ fn run_sequential(steps: &[ScriptStep]) -> Result<(), String> {
 
 fn run_parallel(steps: Vec<ScriptStep>) -> Result<(), String> {
     std::thread::spawn(move || {
-        let handles: Vec<_> = steps.into_iter().map(|step| {
-            std::thread::spawn(move || { let _ = exec_step(&step); })
-        }).collect();
-        for h in handles { let _ = h.join(); }
+        let handles: Vec<_> = steps
+            .into_iter()
+            .map(|step| {
+                std::thread::spawn(move || {
+                    let _ = exec_step(&step);
+                })
+            })
+            .collect();
+        for h in handles {
+            let _ = h.join();
+        }
     });
     Ok(())
 }
@@ -234,32 +318,37 @@ fn run_parallel(steps: Vec<ScriptStep>) -> Result<(), String> {
 fn exec_step(step: &ScriptStep) -> Result<(), String> {
     match step.step_type.as_str() {
         "command_ref" => exec_command_ref(step),
-        "delay"       => exec_delay(step),
-        "custom"      => exec_custom(step),
-        "spotify"     => exec_spotify(step),
-        other         => Err(format!("Unknown script step type: '{}'", other)),
+        "delay" => exec_delay(step),
+        "custom" => exec_custom(step),
+        "spotify" => exec_spotify(step),
+        other => Err(format!("Unknown script step type: '{}'", other)),
     }
 }
 
 fn exec_command_ref(step: &ScriptStep) -> Result<(), String> {
-    // Look up the command in the already-loaded COMMANDS_LIST
-    let cmds_guard = crate::COMMANDS_LIST.read();
+    // Look up the command in the command registry
+    let cmds_guard = crate::command_registry::read();
     let cmds_list = &*cmds_guard;
 
     for cmd_list in cmds_list {
-        let pack_name = cmd_list.path.file_name()
+        let pack_name = cmd_list
+            .path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("");
-        if pack_name != step.pack { continue; }
+        if pack_name != step.pack {
+            continue;
+        }
 
         if let Some(cmd) = cmd_list.commands.iter().find(|c| c.id == step.command_id) {
-            return crate::commands::execute_command(&cmd_list.path, cmd, None, None)
-                .map(|_| ())
-                .map_err(|e| e);
+            return crate::commands::execute_command(&cmd_list.path, cmd, None, None).map(|_| ());
         }
     }
 
-    Err(format!("Script command ref '{}/{}' not found", step.pack, step.command_id))
+    Err(format!(
+        "Script command ref '{}/{}' not found",
+        step.pack, step.command_id
+    ))
 }
 
 fn exec_delay(step: &ScriptStep) -> Result<(), String> {
@@ -288,8 +377,8 @@ fn exec_spotify(step: &ScriptStep) -> Result<(), String> {
             format!("Start-Process 'spotify:track:{}'", step.spotify_track_id)
         }
         "pause" => "(New-Object -ComObject WScript.Shell).SendKeys([char]179)".to_string(),
-        "next"  => "(New-Object -ComObject WScript.Shell).SendKeys([char]176)".to_string(),
-        other   => return Err(format!("Unknown spotify action: '{}'", other)),
+        "next" => "(New-Object -ComObject WScript.Shell).SendKeys([char]176)".to_string(),
+        other => return Err(format!("Unknown spotify action: '{}'", other)),
     };
     Proc::new("powershell")
         .args(["-NoProfile", "-Command", &ps_cmd])
@@ -322,6 +411,60 @@ pub fn load_script(id: &str) -> Option<Script> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    fn write_script_toml(dir: &std::path::Path, id: &str, name: &str) {
+        let content = format!(
+            "id = \"{}\"\nname = \"{}\"\nmode = \"sequential\"\n",
+            id, name
+        );
+        fs::write(dir.join(format!("{}.toml", id)), content).unwrap();
+    }
+
+    #[test]
+    fn user_script_overrides_bundled_same_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+        fs::create_dir_all(&bundled).unwrap();
+        fs::create_dir_all(&user).unwrap();
+
+        write_script_toml(&bundled, "morning-routine", "Morning Routine (default)");
+        write_script_toml(&user, "morning-routine", "Morning Routine (user)");
+
+        let result = parse_scripts_from_dirs(&bundled, &user);
+        let script = result.iter().find(|s| s.id == "morning-routine").unwrap();
+        assert_eq!(script.name, "Morning Routine (user)");
+    }
+
+    #[test]
+    fn unique_user_script_included() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+        fs::create_dir_all(&bundled).unwrap();
+        fs::create_dir_all(&user).unwrap();
+
+        write_script_toml(&bundled, "default-script", "Default");
+        write_script_toml(&user, "my-script", "My Script");
+
+        let result = parse_scripts_from_dirs(&bundled, &user);
+        let ids: Vec<_> = result.iter().map(|s| s.id.as_str()).collect();
+        assert!(ids.contains(&"my-script"));
+        assert!(ids.contains(&"default-script"));
+    }
+
+    #[test]
+    fn missing_user_scripts_dir_ok() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("nonexistent");
+        fs::create_dir_all(&bundled).unwrap();
+        write_script_toml(&bundled, "s1", "Script 1");
+
+        let result = parse_scripts_from_dirs(&bundled, &user);
+        assert_eq!(result.len(), 1);
+    }
 
     fn make_script(id: &str, phrases_ru: Vec<&str>) -> Script {
         Script {
@@ -363,29 +506,66 @@ mod tests {
         let result = load_script("definitely_nonexistent_id_xyz_abc_12345");
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_as_virtual_commands_includes_phrases() {
+        let script = Script {
+            id: "test_script".to_string(),
+            name: "Test Script".to_string(),
+            description: String::new(),
+            phrases_ru: vec!["привет мир".to_string()],
+            phrases_en: vec!["hello world".to_string()],
+            steps: vec![],
+            mode: "sequential".to_string(),
+            patterns: vec![],
+            sounds_ru: vec![],
+            response_sound: String::new(),
+        };
+        let virtual_cmds = as_virtual_commands(&[script]);
+        assert_eq!(virtual_cmds.len(), 1);
+        let cmd = &virtual_cmds[0].commands[0];
+        assert_eq!(cmd.cmd_type, "script_ref");
+        assert_eq!(cmd.id, "test_script");
+        // Core purpose: verify phrases are propagated for intent classifier training
+        let phrases_ru = cmd.phrases.get("ru").map(|v| v.as_slice()).unwrap_or(&[]);
+        let phrases_en = cmd.phrases.get("en").map(|v| v.as_slice()).unwrap_or(&[]);
+        assert!(
+            phrases_ru.contains(&"привет мир".to_string()),
+            "phrases_ru not propagated: {:?}",
+            phrases_ru
+        );
+        assert!(
+            phrases_en.contains(&"hello world".to_string()),
+            "phrases_en not propagated: {:?}",
+            phrases_en
+        );
+    }
 }
 
 pub fn as_virtual_commands(scripts: &[Script]) -> Vec<crate::JCommandsList> {
     let dir = scripts_dir();
-    scripts.iter().filter_map(|s| {
-        if s.phrases_ru.is_empty() && s.phrases_en.is_empty() {
-            return None;
-        }
-        let mut phrases = std::collections::HashMap::new();
-        if !s.phrases_ru.is_empty() {
-            phrases.insert("ru".to_string(), s.phrases_ru.clone());
-        }
-        if !s.phrases_en.is_empty() {
-            phrases.insert("en".to_string(), s.phrases_en.clone());
-        }
-        let mut sounds = std::collections::HashMap::new();
-        if !s.sounds_ru.is_empty() {
-            sounds.insert("ru".to_string(), s.sounds_ru.clone());
-        }
-        let cmd = crate::commands::JCommand::new_script_ref(s.id.clone(), phrases, sounds);
-        Some(crate::JCommandsList {
-            path: dir.clone(),
-            commands: vec![cmd],
+    scripts
+        .iter()
+        .filter_map(|s| {
+            if s.phrases_ru.is_empty() && s.phrases_en.is_empty() {
+                return None;
+            }
+            let mut phrases = std::collections::HashMap::new();
+            if !s.phrases_ru.is_empty() {
+                phrases.insert("ru".to_string(), s.phrases_ru.clone());
+            }
+            if !s.phrases_en.is_empty() {
+                phrases.insert("en".to_string(), s.phrases_en.clone());
+            }
+            let mut sounds = std::collections::HashMap::new();
+            if !s.sounds_ru.is_empty() {
+                sounds.insert("ru".to_string(), s.sounds_ru.clone());
+            }
+            let cmd = crate::commands::JCommand::new_script_ref(s.id.clone(), phrases, sounds);
+            Some(crate::JCommandsList {
+                path: dir.clone(),
+                commands: vec![cmd],
+            })
         })
-    }).collect()
+        .collect()
 }

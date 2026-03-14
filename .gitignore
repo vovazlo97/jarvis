@@ -34,7 +34,10 @@ node_modules/
 
 # ── AI / STT Models (download via setup.ps1) ──────────────────────────────────
 resources/vosk/
-resources/models/
+# Ignore model binaries but track model.toml descriptors
+resources/models/**
+!resources/models/*/
+!resources/models/*/model.toml
 resources/vosk-api-*
 
 # ── Runtime binaries at repo root (present in lib/windows/amd64/) ─────────────

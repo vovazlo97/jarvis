@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::fs;
-use std::time::Duration;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+use std::time::Duration;
 
 // ── Hardcoded fallback paths ──────────────────────────────────────────────────
 #[cfg(target_os = "windows")]
@@ -21,44 +21,83 @@ pub use structs::*;
 use crate::{config, i18n, APP_DIR};
 
 #[cfg(feature = "lua")]
-use crate::lua::{self, SandboxLevel, CommandContext};
+use crate::lua::{self, CommandContext, SandboxLevel};
+
+/// Core merge logic — reads command packs from two directories.
+/// User packs override bundled packs with the same folder name.
+/// Missing directories are silently skipped (no panic).
+pub fn parse_commands_from_dirs(bundled_dir: &Path, user_dir: &Path) -> Vec<JCommandsList> {
+    let mut packs: std::collections::HashMap<String, JCommandsList> =
+        std::collections::HashMap::new();
+
+    // Load bundled packs first (lower priority)
+    if let Ok(entries) = fs::read_dir(bundled_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let toml_file = path.join("command.toml");
+            if !toml_file.exists() {
+                continue;
+            }
+            let pack_name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            if let Some(list) = load_pack(&path, &toml_file) {
+                packs.insert(pack_name, list);
+            }
+        }
+    }
+
+    // Load user packs second — overrides bundled packs with same name
+    if user_dir.exists() {
+        if let Ok(entries) = fs::read_dir(user_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let toml_file = path.join("command.toml");
+                if !toml_file.exists() {
+                    continue;
+                }
+                let pack_name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                if let Some(list) = load_pack(&path, &toml_file) {
+                    packs.insert(pack_name, list);
+                }
+            }
+        }
+    }
+
+    packs.into_values().collect()
+}
+
+fn load_pack(pack_path: &Path, toml_file: &Path) -> Option<JCommandsList> {
+    let content = match fs::read_to_string(toml_file) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("Failed to read {}: {}", toml_file.display(), e);
+            return None;
+        }
+    };
+    match toml::from_str::<JCommandsList>(&content) {
+        Ok(file) => Some(JCommandsList {
+            path: pack_path.to_path_buf(),
+            commands: file.commands,
+        }),
+        Err(e) => {
+            warn!("Failed to parse {}: {}", toml_file.display(), e);
+            None
+        }
+    }
+}
 
 pub fn parse_commands() -> Result<Vec<JCommandsList>, String> {
-    let mut commands: Vec<JCommandsList> = Vec::new();
+    let bundled_dir = APP_DIR.join(config::COMMANDS_PATH);
+    let user_dir = config::user_commands_dir();
 
-    let commands_path = APP_DIR.join(config::COMMANDS_PATH);
-    let cmd_dirs = fs::read_dir(&commands_path)
-        .map_err(|e| format!("Error reading commands directory {:?}: {}", commands_path, e))?;
-
-    for entry in cmd_dirs.flatten() {
-        let cmd_path = entry.path();
-        let toml_file = cmd_path.join("command.toml");
-        
-        if !toml_file.exists() {
-            continue;
-        }
-        
-        let content = match fs::read_to_string(&toml_file) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Failed to read {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
-
-        let file: JCommandsList = match toml::from_str(&content) {
-            Ok(f) => f,
-            Err(e) => {
-                warn!("Failed to parse {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
-
-        commands.push(JCommandsList {
-            path: cmd_path,
-            commands: file.commands,
-        });
-    }
+    let commands = parse_commands_from_dirs(&bundled_dir, &user_dir);
 
     if commands.is_empty() {
         Err("No commands found".into())
@@ -68,32 +107,35 @@ pub fn parse_commands() -> Result<Vec<JCommandsList>, String> {
     }
 }
 
-
 pub fn commands_hash(commands: &[JCommandsList]) -> String {
-    use sha2::{Sha256, Digest};
-    
+    use sha2::{Digest, Sha256};
+
     let mut hasher = Sha256::new();
-    
+
     let lang = i18n::get_language();
     hasher.update(lang.as_bytes());
     hasher.update(b"|");
 
     // collect all command ids and phrases for current language, sorted
-    let mut all_data: Vec<(&str, _)> = commands.iter()
-        .flat_map(|ac| ac.commands.iter().map(|c| (c.id.as_str(), c.get_phrases(&lang))))
+    let mut all_data: Vec<(&str, _)> = commands
+        .iter()
+        .flat_map(|ac| {
+            ac.commands
+                .iter()
+                .map(|c| (c.id.as_str(), c.get_phrases(&lang)))
+        })
         .collect();
     all_data.sort_by_key(|(id, _)| *id);
-    
+
     for (id, phrases) in all_data {
         hasher.update(id.as_bytes());
         for phrase in phrases.iter() {
             hasher.update(phrase.as_bytes());
         }
     }
-    
+
     format!("{:x}", hasher.finalize())
 }
-
 
 pub fn fetch_command<'a>(
     phrase: &str,
@@ -116,12 +158,18 @@ pub fn fetch_command<'a>(
                     match Regex::new(pattern) {
                         Ok(re) => {
                             if re.is_match(&phrase) {
-                                info!("Regex match: '{}' -> cmd '{}' (pattern: '{}')", phrase, cmd.id, pattern);
+                                info!(
+                                    "Regex match: '{}' -> cmd '{}' (pattern: '{}')",
+                                    phrase, cmd.id, pattern
+                                );
                                 return Some((&cmd_list.path, cmd));
                             }
                         }
                         Err(e) => {
-                            warn!("Invalid regex pattern '{}' in cmd '{}': {}", pattern, cmd.id, e);
+                            warn!(
+                                "Invalid regex pattern '{}' in cmd '{}': {}",
+                                pattern, cmd.id, e
+                            );
                         }
                     }
                 }
@@ -138,27 +186,27 @@ pub fn fetch_command<'a>(
     for cmd_list in commands {
         for cmd in &cmd_list.commands {
             let cmd_phrases = cmd.get_phrases(&lang);
-            
+
             for cmd_phrase in cmd_phrases.iter() {
                 let cmd_phrase_lower = cmd_phrase.trim().to_lowercase();
                 let cmd_phrase_chars: Vec<char> = cmd_phrase_lower.chars().collect();
-                
+
                 // character-level similarity
                 let char_ratio = ratio(&phrase_chars, &cmd_phrase_chars);
-                
+
                 // word-level similarity
                 let cmd_words: Vec<&str> = cmd_phrase_lower.split_whitespace().collect();
                 let word_score = word_overlap_score(&phrase_words, &cmd_words);
-                
+
                 // combined score
                 let score = (char_ratio * 0.6) + (word_score * 0.4);
-                
+
                 // early exit on perfect match
                 if score >= 99.0 {
                     debug!("Perfect match: '{}' -> '{}'", phrase, cmd_phrase_lower);
                     return Some((&cmd_list.path, cmd));
                 }
-                
+
                 if score > best_score {
                     best_score = score;
                     result = Some((&cmd_list.path, cmd));
@@ -168,14 +216,16 @@ pub fn fetch_command<'a>(
     }
 
     if let Some((_, cmd)) = result {
-        info!("Fuzzy match: '{}' -> cmd '{}' (score: {:.1}%)", phrase, cmd.id, best_score);
+        info!(
+            "Fuzzy match: '{}' -> cmd '{}' (score: {:.1}%)",
+            phrase, cmd.id, best_score
+        );
     } else {
         debug!("No match for '{}' (best: {:.1}%)", phrase, best_score);
     }
-    
+
     result
 }
-
 
 fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
     if input_words.is_empty() || cmd_words.is_empty() {
@@ -183,21 +233,18 @@ fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
     }
 
     let mut matched = 0.0;
-    
+
     // pre-compute cmd word chars to avoid repeated allocations
-    let cmd_word_chars: Vec<Vec<char>> = cmd_words
-        .iter()
-        .map(|w| w.chars().collect())
-        .collect();
-    
+    let cmd_word_chars: Vec<Vec<char>> = cmd_words.iter().map(|w| w.chars().collect()).collect();
+
     for input_word in input_words {
         let input_chars: Vec<char> = input_word.chars().collect();
-        
+
         let best_word_match = cmd_word_chars
             .iter()
             .map(|cw| ratio(&input_chars, cw))
             .fold(0.0_f64, f64::max);
-        
+
         if best_word_match > 70.0 {
             matched += best_word_match / 100.0;
         }
@@ -206,9 +253,6 @@ fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
     let max_words = input_words.len().max(cmd_words.len()) as f64;
     (matched / max_words) * 100.0
 }
-
-
-
 
 pub fn execute_exe(exe: &str, args: &[String]) -> std::io::Result<Child> {
     Command::new(exe).args(args).spawn()
@@ -247,18 +291,20 @@ pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
     Command::new("sh").arg("-c").arg(cmd).args(args).spawn()
 }
 
-pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option<&str>, slots: Option<&HashMap<String, SlotValue>>) -> Result<bool, String> {
+pub fn execute_command(
+    cmd_path: &PathBuf,
+    cmd_config: &JCommand,
+    _phrase: Option<&str>,
+    _slots: Option<&HashMap<String, SlotValue>>,
+) -> Result<bool, String> {
     // execute command by the type
     match cmd_config.cmd_type.as_str() {
-
         // BRUH
         "voice" => Ok(cmd_config.allow_chaining),
-        
+
         // LUA command
         #[cfg(feature = "lua")]
-        "lua" => {
-            execute_lua_command(cmd_path, cmd_config, phrase, slots)
-        }
+        "lua" => execute_lua_command(cmd_path, cmd_config, _phrase, _slots),
 
         // Direct executable launch (games, apps)
         // Uses exe's own directory as working dir so DLL lookups succeed
@@ -272,11 +318,16 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
                 exe_path_local.clone()
             };
 
-            let work_dir = exe_path.parent()
+            let work_dir = exe_path
+                .parent()
                 .map(|p| p.to_path_buf())
                 .unwrap_or_else(|| exe_path.clone());
 
-            info!("Launching exe: {} (cwd: {})", exe_path.display(), work_dir.display());
+            info!(
+                "Launching exe: {} (cwd: {})",
+                exe_path.display(),
+                work_dir.display()
+            );
 
             Command::new(&exe_path)
                 .args(&cmd_config.exe_args)
@@ -304,13 +355,13 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
                 .map(|_| cmd_config.allow_chaining)
                 .map_err(|e| format!("CLI command error: {}", e))
         }
-        
+
         // TERMINATOR command (T1000)
         "terminate" => {
             std::thread::sleep(Duration::from_secs(2));
             std::process::exit(0);
         }
-        
+
         // STOP CHANING
         "stop_chaining" => Ok(false),
 
@@ -346,7 +397,7 @@ fn execute_lua_command(
     cmd_path: &PathBuf,
     cmd_config: &JCommand,
     phrase: Option<&str>,
-    slots: Option<&HashMap<String, SlotValue>>
+    slots: Option<&HashMap<String, SlotValue>>,
 ) -> Result<bool, String> {
     // get script path
 
@@ -355,13 +406,13 @@ fn execute_lua_command(
     } else {
         &cmd_config.script
     };
-    
+
     let script_path = cmd_path.join(script_name);
-    
+
     if !script_path.exists() {
         return Err(format!("Lua script not found: {}", script_path.display()));
     }
-    
+
     // parse sandbox level
     let sandbox = SandboxLevel::from_str(&cmd_config.sandbox);
 
@@ -373,17 +424,22 @@ fn execute_lua_command(
         language: i18n::get_language(),
         slots: slots.map(|s| s.clone()),
     };
-    
+
     // get timeout
     let timeout = Duration::from_millis(cmd_config.timeout);
-    
-    info!("Executing Lua command: {} (sandbox: {:?}, timeout: {:?})", 
-          cmd_config.id, sandbox, timeout);
-    
+
+    info!(
+        "Executing Lua command: {} (sandbox: {:?}, timeout: {:?})",
+        cmd_config.id, sandbox, timeout
+    );
+
     // execute
     match lua::execute(&script_path, context, sandbox, timeout) {
         Ok(result) => {
-            info!("Lua command {} completed (chain: {})", cmd_config.id, result.chain);
+            info!(
+                "Lua command {} completed (chain: {})",
+                cmd_config.id, result.chain
+            );
             Ok(result.chain)
         }
         Err(e) => {
@@ -403,16 +459,21 @@ mod tests {
     }
 
     fn cmd_list(cmds: Vec<JCommand>) -> Vec<JCommandsList> {
-        vec![JCommandsList { path: PathBuf::from("/test"), commands: cmds }]
+        vec![JCommandsList {
+            path: PathBuf::from("/test"),
+            commands: cmds,
+        }]
     }
 
     #[test]
     fn test_fuzzy_match_russian() {
-        let list = cmd_list(vec![cmd_from_toml(r#"
+        let list = cmd_list(vec![cmd_from_toml(
+            r#"
             id = "greet"
             type = "voice"
             phrases.ru = ["привет джарвис", "здравствуй джарвис"]
-        "#)]);
+        "#,
+        )]);
         let r = fetch_command("привет джарвис", &list);
         assert!(r.is_some(), "должно находить по fuzzy");
         assert_eq!(r.unwrap().1.id, "greet");
@@ -420,11 +481,13 @@ mod tests {
 
     #[test]
     fn test_no_match_returns_none() {
-        let list = cmd_list(vec![cmd_from_toml(r#"
+        let list = cmd_list(vec![cmd_from_toml(
+            r#"
             id = "greet"
             type = "voice"
             phrases.ru = ["привет"]
-        "#)]);
+        "#,
+        )]);
         assert!(fetch_command("абракадабра xyz", &list).is_none());
     }
 
@@ -432,45 +495,61 @@ mod tests {
     #[test]
     fn test_regex_priority_over_fuzzy() {
         let list = cmd_list(vec![
-            cmd_from_toml(r#"
+            cmd_from_toml(
+                r#"
                 id = "youtube"
                 type = "voice"
                 phrases.ru = ["открой видео"]
                 patterns = ["ютуб", "открой.*ютуб"]
-            "#),
-            cmd_from_toml(r#"
+            "#,
+            ),
+            cmd_from_toml(
+                r#"
                 id = "other"
                 type = "voice"
                 phrases.ru = ["другая команда"]
-            "#),
+            "#,
+            ),
         ]);
         let r = fetch_command("открой ютуб пожалуйста", &list);
         assert!(r.is_some());
-        assert_eq!(r.unwrap().1.id, "youtube", "regex должен иметь приоритет над fuzzy");
+        assert_eq!(
+            r.unwrap().1.id,
+            "youtube",
+            "regex должен иметь приоритет над fuzzy"
+        );
     }
 
     #[cfg(feature = "regex")]
     #[test]
     fn test_invalid_regex_no_panic() {
-        let list = cmd_list(vec![cmd_from_toml(r#"
+        let list = cmd_list(vec![cmd_from_toml(
+            r#"
             id = "cmd"
             type = "voice"
             phrases.ru = ["тест"]
             patterns = ["[bad("]
-        "#)]);
+        "#,
+        )]);
         let _ = fetch_command("тест", &list); // не должен паниковать
     }
 
     #[test]
     fn test_voice_cmd_returns_false_by_default() {
         let cmd = cmd_from_toml("id = \"noop\"\ntype = \"voice\"\n");
-        assert_eq!(execute_command(&PathBuf::from("/t"), &cmd, None, None), Ok(false));
+        assert_eq!(
+            execute_command(&PathBuf::from("/t"), &cmd, None, None),
+            Ok(false)
+        );
     }
 
     #[test]
     fn test_voice_cmd_with_allow_chaining_returns_true() {
         let cmd = cmd_from_toml("id = \"noop\"\ntype = \"voice\"\nallow_chaining = true\n");
-        assert_eq!(execute_command(&PathBuf::from("/t"), &cmd, None, None), Ok(true));
+        assert_eq!(
+            execute_command(&PathBuf::from("/t"), &cmd, None, None),
+            Ok(true)
+        );
     }
 
     #[test]
@@ -478,27 +557,115 @@ mod tests {
         for t in &["voice", "exe", "url", "cli"] {
             let toml = format!("id = \"x\"\ntype = \"{}\"\n", t);
             let cmd: JCommand = toml::from_str(&toml).unwrap();
-            assert!(!cmd.allow_chaining, "type={} should default to no chaining", t);
+            assert!(
+                !cmd.allow_chaining,
+                "type={} should default to no chaining",
+                t
+            );
         }
     }
 
     #[test]
     fn test_allow_chaining_opt_in() {
-        let cmd: JCommand = toml::from_str(
-            "id = \"x\"\ntype = \"voice\"\nallow_chaining = true\n"
-        ).unwrap();
+        let cmd: JCommand =
+            toml::from_str("id = \"x\"\ntype = \"voice\"\nallow_chaining = true\n").unwrap();
         assert!(cmd.allow_chaining);
     }
 
     #[test]
     fn test_stop_chaining_returns_false() {
         let cmd = cmd_from_toml("id = \"stop\"\ntype = \"stop_chaining\"\n");
-        assert_eq!(execute_command(&PathBuf::from("/t"), &cmd, None, None), Ok(false));
+        assert_eq!(
+            execute_command(&PathBuf::from("/t"), &cmd, None, None),
+            Ok(false)
+        );
     }
 
     #[test]
     fn test_unknown_type_is_err() {
         let cmd = cmd_from_toml("id = \"unk\"\ntype = \"totally_unknown\"\n");
         assert!(execute_command(&PathBuf::from("/t"), &cmd, None, None).is_err());
+    }
+
+    fn write_command_toml(dir: &std::path::Path, id: &str) {
+        let content = format!(
+            "[[commands]]\nid = \"{}\"\ntype = \"cli\"\ncli_cmd = \"echo\"\nsounds.ru = [\"ok1\"]\n",
+            id
+        );
+        fs::write(dir.join("command.toml"), content).unwrap();
+    }
+
+    /// User pack with same name as bundled must override bundled.
+    #[test]
+    fn user_pack_overrides_bundled_same_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+
+        let b_games = bundled.join("games");
+        fs::create_dir_all(&b_games).unwrap();
+        write_command_toml(&b_games, "witcher");
+
+        let u_games = user.join("games");
+        fs::create_dir_all(&u_games).unwrap();
+        write_command_toml(&u_games, "cyberpunk");
+
+        let result = parse_commands_from_dirs(&bundled, &user);
+        let ids: Vec<_> = result
+            .iter()
+            .flat_map(|l| l.commands.iter().map(|c| c.id.as_str()))
+            .collect();
+        assert!(
+            ids.contains(&"cyberpunk"),
+            "user pack must override bundled"
+        );
+        assert!(
+            !ids.contains(&"witcher"),
+            "bundled pack must be overridden by user"
+        );
+    }
+
+    /// Unique user pack (not in bundled) must appear in merged result.
+    #[test]
+    fn unique_user_pack_included() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+        fs::create_dir_all(&bundled).unwrap();
+
+        let u_custom = user.join("my-custom");
+        fs::create_dir_all(&u_custom).unwrap();
+        write_command_toml(&u_custom, "my-cmd");
+
+        let b_default = bundled.join("default");
+        fs::create_dir_all(&b_default).unwrap();
+        write_command_toml(&b_default, "default-cmd");
+
+        let result = parse_commands_from_dirs(&bundled, &user);
+        let ids: Vec<_> = result
+            .iter()
+            .flat_map(|l| l.commands.iter().map(|c| c.id.as_str()))
+            .collect();
+        assert!(ids.contains(&"my-cmd"), "user-only pack must be included");
+        assert!(
+            ids.contains(&"default-cmd"),
+            "bundled-only pack must be included"
+        );
+    }
+
+    /// Non-existent user dir must not panic — silently skip.
+    #[test]
+    fn missing_user_dir_is_ok() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("nonexistent_user");
+        fs::create_dir_all(&bundled).unwrap();
+
+        let b_pack = bundled.join("pack");
+        fs::create_dir_all(&b_pack).unwrap();
+        write_command_toml(&b_pack, "cmd");
+
+        let result = parse_commands_from_dirs(&bundled, &user);
+        assert_eq!(result.len(), 1);
     }
 }

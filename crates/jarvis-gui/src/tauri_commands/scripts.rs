@@ -1,16 +1,14 @@
+use jarvis_core::{config, APP_DIR};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as Proc;
-use serde::{Deserialize, Serialize};
-use jarvis_core::{APP_DIR, config};
-
-const SCRIPTS_DIR: &str = "resources/scripts";
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ScriptStep {
-    pub step_type: String,        // "command_ref" | "delay" | "custom"
+    pub step_type: String, // "command_ref" | "delay" | "custom"
     #[serde(default)]
     pub label: String,
     // command_ref
@@ -39,7 +37,7 @@ pub struct Script {
     pub name: String,
     #[serde(default)]
     pub description: String,
-    pub mode: String,             // "sequential" | "parallel"
+    pub mode: String, // "sequential" | "parallel"
     #[serde(default)]
     pub steps: Vec<ScriptStep>,
     #[serde(default)]
@@ -69,7 +67,9 @@ pub fn list_scripts() -> Vec<Script> {
 
     for entry in entries.flatten() {
         let p = entry.path();
-        if p.extension().and_then(|e| e.to_str()) != Some("toml") { continue; }
+        if p.extension().and_then(|e| e.to_str()) != Some("toml") {
+            continue;
+        }
         if let Ok(content) = fs::read_to_string(&p) {
             if let Ok(script) = toml::from_str::<Script>(&content) {
                 out.push(script);
@@ -86,11 +86,10 @@ pub fn list_scripts() -> Vec<Script> {
 #[tauri::command]
 pub fn save_script(script: Script, old_id: Option<String>) -> Result<(), String> {
     validate_script_id(&script.id)?;
-    fs::create_dir_all(scripts_dir())
-        .map_err(|e| format!("Cannot create scripts dir: {}", e))?;
+    fs::create_dir_all(scripts_dir()).map_err(|e| format!("Cannot create scripts dir: {}", e))?;
 
-    let content = toml::to_string_pretty(&script)
-        .map_err(|e| format!("Cannot serialize script: {}", e))?;
+    let content =
+        toml::to_string_pretty(&script).map_err(|e| format!("Cannot serialize script: {}", e))?;
 
     fs::write(script_path(&script.id), content)
         .map_err(|e| format!("Cannot write script: {}", e))?;
@@ -126,12 +125,12 @@ pub fn run_script(script_id: String) -> Result<(), String> {
     validate_script_id(&script_id)?;
     let content = fs::read_to_string(script_path(&script_id))
         .map_err(|e| format!("Cannot read script '{}': {}", script_id, e))?;
-    let script: Script = toml::from_str(&content)
-        .map_err(|e| format!("Cannot parse script: {}", e))?;
+    let script: Script =
+        toml::from_str(&content).map_err(|e| format!("Cannot parse script: {}", e))?;
 
     match script.mode.as_str() {
         "parallel" => run_parallel(&script.steps),
-        _          => run_sequential(&script.steps),
+        _ => run_sequential(&script.steps),
     }
 }
 
@@ -150,10 +149,14 @@ fn run_parallel(steps: &[ScriptStep]) -> Result<(), String> {
     thread::spawn(move || {
         let mut handles = Vec::new();
         for step in steps_owned {
-            let h = thread::spawn(move || { let _ = exec_step(&step); });
+            let h = thread::spawn(move || {
+                let _ = exec_step(&step);
+            });
             handles.push(h);
         }
-        for h in handles { let _ = h.join(); }
+        for h in handles {
+            let _ = h.join();
+        }
     });
     Ok(())
 }
@@ -161,15 +164,16 @@ fn run_parallel(steps: &[ScriptStep]) -> Result<(), String> {
 fn exec_step(step: &ScriptStep) -> Result<(), String> {
     match step.step_type.as_str() {
         "command_ref" => exec_command_ref(step),
-        "delay"       => exec_delay(step),
-        "custom"      => exec_custom(step),
-        "spotify"     => exec_spotify(step),
-        other         => Err(format!("Unknown step type: {}", other)),
+        "delay" => exec_delay(step),
+        "custom" => exec_custom(step),
+        "spotify" => exec_spotify(step),
+        other => Err(format!("Unknown step type: {}", other)),
     }
 }
 
 fn exec_command_ref(step: &ScriptStep) -> Result<(), String> {
-    let toml_path = APP_DIR.join(config::COMMANDS_PATH)
+    let toml_path = APP_DIR
+        .join(config::COMMANDS_PATH)
         .join(&step.pack)
         .join("command.toml");
 
@@ -177,31 +181,41 @@ fn exec_command_ref(step: &ScriptStep) -> Result<(), String> {
         .map_err(|e| format!("Pack '{}' not found: {}", step.pack, e))?;
 
     #[derive(Deserialize)]
-    struct CommandsList { commands: Vec<RawCmd> }
+    struct CommandsList {
+        commands: Vec<RawCmd>,
+    }
     #[derive(Deserialize)]
     struct RawCmd {
         id: String,
-        #[serde(rename = "type", default)] cmd_type: String,
-        #[serde(default)] exe_path: String,
-        #[serde(default)] exe_args: Vec<String>,
-        #[serde(default)] cli_cmd: String,
-        #[serde(default)] cli_args: Vec<String>,
+        #[serde(rename = "type", default)]
+        cmd_type: String,
+        #[serde(default)]
+        exe_path: String,
+        #[serde(default)]
+        exe_args: Vec<String>,
+        #[serde(default)]
+        cli_cmd: String,
+        #[serde(default)]
+        cli_args: Vec<String>,
     }
 
     let list: CommandsList = toml::from_str(&content)
         .map_err(|e| format!("Cannot parse pack '{}': {}", step.pack, e))?;
 
-    let cmd = list.commands.into_iter()
+    let cmd = list
+        .commands
+        .into_iter()
         .find(|c| c.id == step.command_id)
-        .ok_or_else(|| format!("Command '{}' not found in pack '{}'", step.command_id, step.pack))?;
+        .ok_or_else(|| {
+            format!(
+                "Command '{}' not found in pack '{}'",
+                step.command_id, step.pack
+            )
+        })?;
 
     match cmd.cmd_type.as_str() {
-        "exe" | "url" => {
-            spawn_exe(&cmd.exe_path, &cmd.exe_args)
-        }
-        "cli" => {
-            spawn_cli(&cmd.cli_cmd, &cmd.cli_args)
-        }
+        "exe" | "url" => spawn_exe(&cmd.exe_path, &cmd.exe_args),
+        "cli" => spawn_cli(&cmd.cli_cmd, &cmd.cli_args),
         other => Err(format!("Unsupported command type '{}' in script", other)),
     }
 }
@@ -227,8 +241,8 @@ fn exec_spotify(step: &ScriptStep) -> Result<(), String> {
             format!("Start-Process 'spotify:track:{}'", step.spotify_track_id)
         }
         "pause" => "(New-Object -ComObject WScript.Shell).SendKeys([char]179)".to_string(),
-        "next"  => "(New-Object -ComObject WScript.Shell).SendKeys([char]176)".to_string(),
-        other   => return Err(format!("Unknown spotify action: '{}'", other)),
+        "next" => "(New-Object -ComObject WScript.Shell).SendKeys([char]176)".to_string(),
+        other => return Err(format!("Unknown spotify action: '{}'", other)),
     };
     Proc::new("powershell")
         .args(["-NoProfile", "-Command", &ps_cmd])
@@ -259,7 +273,7 @@ fn spawn_cli(cmd: &str, args: &[String]) -> Result<(), String> {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn scripts_dir() -> PathBuf {
-    APP_DIR.join(SCRIPTS_DIR)
+    jarvis_core::config::user_scripts_dir()
 }
 
 fn script_path(id: &str) -> PathBuf {

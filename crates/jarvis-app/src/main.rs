@@ -1,14 +1,13 @@
 use jarvis_core::slots;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 
 // include core
 use jarvis_core::{
-    audio, audio_processing, commands, config, db, listener, recorder, stt, intent,
+    audio, audio_processing, command_registry, commands, config, db, i18n, intent,
     ipc::{self, IpcAction},
-    i18n, voices, models, scripts,
-    APP_CONFIG_DIR, APP_DIR, APP_LOG_DIR, COMMANDS_LIST, DB,
+    listener, models, recorder, scripts, stt, voices, APP_CONFIG_DIR, APP_DIR, APP_LOG_DIR, DB,
 };
 
 // include log
@@ -18,6 +17,7 @@ mod log;
 
 // include app
 mod app;
+mod fast_path;
 
 // include tray
 // @TODO. macOS currently not supported for tray functionality.
@@ -35,7 +35,10 @@ fn main() -> Result<(), String> {
 
     // log some base info
     info!("Starting Jarvis v{} ...", config::APP_VERSION.unwrap());
-    info!("Config directory is: {}", APP_CONFIG_DIR.get().unwrap().display());
+    info!(
+        "Config directory is: {}",
+        APP_CONFIG_DIR.get().unwrap().display()
+    );
     info!("Log directory is: {}", APP_LOG_DIR.get().unwrap().display());
 
     // initialize settings
@@ -43,7 +46,7 @@ fn main() -> Result<(), String> {
 
     // set global DB (for core modules that read settings at init time)
     DB.set(settings.arc().clone())
-            .expect("DB already initialized");
+        .expect("DB already initialized");
 
     // init voices
     let voice_id = settings.lock().voice.clone();
@@ -70,7 +73,10 @@ fn main() -> Result<(), String> {
         let vosk_dir = APP_DIR.join("resources/vosk");
         if !vosk_dir.exists() {
             error!("Vosk models directory not found: {}", vosk_dir.display());
-            error!("Please place a Vosk model folder inside: {}", vosk_dir.display());
+            error!(
+                "Please place a Vosk model folder inside: {}",
+                vosk_dir.display()
+            );
             app::close(1);
         } else {
             info!("Vosk models directory found: {}", vosk_dir.display());
@@ -79,7 +85,10 @@ fn main() -> Result<(), String> {
 
     // init stt engine
     if let Err(e) = stt::init() {
-        error!("STT init failed: {}. Check that a Vosk model is present in resources/vosk/", e);
+        error!(
+            "STT init failed: {}. Check that a Vosk model is present in resources/vosk/",
+            e
+        );
         app::close(1); // cannot continue without stt
     }
 
@@ -88,17 +97,27 @@ fn main() -> Result<(), String> {
     let cmds = match commands::parse_commands() {
         Ok(c) => c,
         Err(e) => {
-            warn!("Failed to parse commands: {}. Starting with empty command list.", e);
+            warn!(
+                "Failed to parse commands: {}. Starting with empty command list.",
+                e
+            );
             Vec::new()
         }
     };
-    info!("Commands initialized. Count: {}, List: {:?}", cmds.len(), commands::list_paths(&cmds));
+    info!(
+        "Commands initialized. Count: {}, List: {:?}",
+        cmds.len(),
+        commands::list_paths(&cmds)
+    );
 
     // Scripts are matched live from disk via fetch_script_live() — no stale state on delete/create.
     let script_count = scripts::parse_scripts().len();
-    info!("Scripts found on disk: {} (matched live, not pre-registered)", script_count);
+    info!(
+        "Scripts found on disk: {} (matched live, not pre-registered)",
+        script_count
+    );
 
-    *COMMANDS_LIST.write() = cmds;
+    command_registry::load(cmds);
 
     // init audio
     if audio::init().is_err() {
@@ -113,21 +132,27 @@ fn main() -> Result<(), String> {
     }
 
     // shared async runtime for intent classification, IPC, etc.
-    let rt = Arc::new(
-        tokio::runtime::Runtime::new().expect("Failed to create tokio runtime")
-    );
+    let rt = Arc::new(tokio::runtime::Runtime::new().expect("Failed to create tokio runtime"));
 
     // init intent-recognition engine
-    let cmds_for_intent = COMMANDS_LIST.read().to_vec();
+    // Non-fatal: if the selected model is unavailable the app falls back to
+    // regex/fuzzy matching.  A hard exit here would crash the app every time
+    // a model binary is a Git LFS pointer or has been deleted.
+    let cmds_for_intent = command_registry::get_snapshot();
     rt.block_on(async {
         if let Err(e) = intent::init(&cmds_for_intent).await {
-            error!("Failed to initialize intent classifier: {}", e);
-            app::close(1);
+            warn!(
+                "Intent classifier init failed ({}). \
+                 Continuing without embedding classification — regex/fuzzy matching active.",
+                e
+            );
         }
     });
 
-    // init slots parsing engine
-    slots::init().map_err(|e| error!("Slot extraction init failed: {}", e)).ok();
+    // init slots parsing engine — non-critical, warn on failure
+    slots::init()
+        .map_err(|e| warn!("Slot extraction unavailable: {}", e))
+        .ok();
 
     // init audio processing
     info!("Initializing audio processing...");
@@ -153,14 +178,17 @@ fn main() -> Result<(), String> {
                 info!("Received reload commands request — reloading from disk");
                 match commands::parse_commands() {
                     Ok(new_cmds) => {
-                        *COMMANDS_LIST.write() = new_cmds;
+                        command_registry::load(new_cmds);
                         info!("Commands reloaded successfully");
-                        // Retrain intent classifier in background so new voice phrases work.
-                        // Audio pipeline (wake word, STT, recorder) is NOT touched.
-                        let cmds_snapshot = COMMANDS_LIST.read().to_vec();
+                        // Merge script virtual commands so the intent classifier
+                        // also learns new script voice triggers on hot-reload.
+                        let mut all_cmds = command_registry::get_snapshot();
+                        let script_virtual =
+                            scripts::as_virtual_commands(&scripts::parse_scripts());
+                        all_cmds.extend(script_virtual);
                         let reload_rt = Arc::clone(&rt_for_reload);
                         std::thread::spawn(move || {
-                            if let Err(e) = reload_rt.block_on(intent::reinit(&cmds_snapshot)) {
+                            if let Err(e) = reload_rt.block_on(intent::reinit(&all_cmds)) {
                                 error!("Intent classifier reload failed: {}", e);
                             }
                         });
@@ -191,7 +219,7 @@ fn main() -> Result<(), String> {
     std::thread::spawn(move || {
         ipc_rt.block_on(ipc::start_server());
     });
-    
+
     // start the app (in the background thread)
     let app_rt = Arc::clone(&rt);
     std::thread::spawn(move || {

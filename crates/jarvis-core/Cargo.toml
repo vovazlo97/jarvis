@@ -60,6 +60,9 @@ jarvis_app = [
     "lua", "socket2",
     "ort", "ndarray", "tokenizers", "regex",]
 
-intent = ["intent-classifier", "tokio"]
+intent = ["intent-classifier"]
 lua = ["mlua", "reqwest", "winrt-notification"]
-lua_only = ["lua", "tokio"]
+lua_only = ["lua"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros", "sync"] }
