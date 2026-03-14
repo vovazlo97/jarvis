@@ -14,13 +14,14 @@
 | ADR-008 | Intent EmbeddingClassifier falls back to all-MiniLM-L6-v2 | Multilingual model may be LFS pointer (not downloaded); English fallback always present as real binary | 2026-03-14 |
 | ADR-009 | slots_backend normalized case-insensitively | Settings file stores "None" (capital N); GLiNER loader was triggered incorrectly; normalize early in init() | 2026-03-14 |
 | ADR-010 | User data in app_data_dir(), NEVER in resources/ | Two-layer model: bundled (read-only, git) + user (persistent, %APPDATA%\com.priler.jarvis\); merged at startup, user wins; GUI CRUD writes only to user layer; first-run seeding copies bundled defaults | 2026-03-14 |
+| ADR-011 | Linux CI scope: jarvis-core + jarvis-cli --no-default-features only | pv_recorder, rustpotter, kira, rodio require Windows DLLs or ALSA; jarvis-app and jarvis-gui excluded from Linux CI; Windows CI covers full workspace; Phase E target: abstract audio layer for cross-platform | 2026-03-15 |
 
 ## Current State
 
-- **Version:** 0.2.0
+- **Version:** 0.4.0 (Phase D in progress → v0.5.0 target)
 - **Active branch:** feature/phase-c-skills-mcp
-- **Phase:** C — Skills + MCP
-- **Last milestone:** Phase C complete — 5 skills + rules committed to git, GitHub MCP + Filesystem MCP configured in .claude.json (2026-03-14)
+- **Phase:** D — GitOps
+- **Last milestone:** Phase D complete — .github/workflows/ci.yml + release.yml, dependabot.yml, branch-protection.md, CODEOWNERS, CHANGELOG.md created; CI badge added to README.md (2026-03-15)
 
 ## Known Issues & Technical Debt
 
