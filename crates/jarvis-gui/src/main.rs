@@ -18,6 +18,14 @@ pub struct AppState {
 fn main() {
     config::init_dirs().expect("Failed to init dirs");
 
+    // Log user data paths so operators can verify persistence at a glance
+    {
+        let user_cmds = jarvis_core::config::user_commands_dir();
+        let user_scripts = jarvis_core::config::user_scripts_dir();
+        eprintln!("[STARTUP] User data — commands: {:?}", user_cmds);
+        eprintln!("[STARTUP] User data — scripts:  {:?}", user_scripts);
+    }
+
     // basic logging setup (simpler for GUI)
     simple_log::quick!("info");
 

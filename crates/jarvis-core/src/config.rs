@@ -214,6 +214,26 @@ pub const CMS_WAIT_DELAY: std::time::Duration = std::time::Duration::from_secs(1
 //     "очень тонкое замечание сэр",
 // ];
 
+/// Returns the directory where user-created command packs are stored.
+/// Persistent across builds and updates.
+/// Windows: %APPDATA%\com.priler.jarvis\commands\
+pub fn user_commands_dir() -> std::path::PathBuf {
+    crate::APP_CONFIG_DIR
+        .get()
+        .expect("config::init_dirs() must be called before user_commands_dir()")
+        .join("commands")
+}
+
+/// Returns the directory where user-created scripts are stored.
+/// Persistent across builds and updates.
+/// Windows: %APPDATA%\com.priler.jarvis\scripts\
+pub fn user_scripts_dir() -> std::path::PathBuf {
+    crate::APP_CONFIG_DIR
+        .get()
+        .expect("config::init_dirs() must be called before user_scripts_dir()")
+        .join("scripts")
+}
+
 pub fn get_wake_phrases(lang: &str) -> &'static [&'static str] {
     match lang {
         "ru" => &["джарвис", "джервис", "гарвис", "джарви", "гарви"],
