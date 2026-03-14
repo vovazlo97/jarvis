@@ -19,7 +19,9 @@
 
 ## Known Issues & Technical Debt
 
-_(Populated as issues are discovered)_
+| Task | Issue | Notes | Status |
+|---|---|---|---|
+| TASK-006 | Hot-reload не работает несмотря на фикс | WebSocket IPC путь подозрителен — возможно GUI не подключается к jarvis-app во время работы | Отложен |
 
 ## Key Contacts & Context
 
