@@ -2,7 +2,7 @@ use std::sync::mpsc::Receiver;
 
 use jarvis_core::{
     audio_buffer::AudioRingBuffer,
-    audio_processing, config, i18n,
+    audio_processing,
     ipc::{self, IpcEvent},
     listener, recorder, stt, voices, AssistantState,
 };

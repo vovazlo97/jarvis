@@ -18,8 +18,6 @@ use jarvis_core::{
     recorder, scripts, slots, stt, voices, AssistantState, SOUND_DIR,
 };
 
-use crate::should_stop;
-
 // VAD state machine
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum VadState {
