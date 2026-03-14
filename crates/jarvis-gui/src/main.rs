@@ -26,6 +26,9 @@ fn main() {
         eprintln!("[STARTUP] User data — scripts:  {:?}", user_scripts);
     }
 
+    // Seed user data on first run (copies bundled defaults to app_data_dir)
+    tauri_commands::seed_user_commands();
+
     // basic logging setup (simpler for GUI)
     simple_log::quick!("info");
 

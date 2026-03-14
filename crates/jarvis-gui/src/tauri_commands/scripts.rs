@@ -4,8 +4,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as Proc;
 
-const SCRIPTS_DIR: &str = "resources/scripts";
-
 // ── Data model ────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -275,7 +273,7 @@ fn spawn_cli(cmd: &str, args: &[String]) -> Result<(), String> {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn scripts_dir() -> PathBuf {
-    APP_DIR.join(SCRIPTS_DIR)
+    jarvis_core::config::user_scripts_dir()
 }
 
 fn script_path(id: &str) -> PathBuf {
