@@ -15,6 +15,7 @@ _(Phase A complete — see Done below)_
 - [x] TASK-004: Define Agent Registry schema
 - [x] TASK-005: Extract Fast Path boundary into separate module
 - [x] TASK-006: Hot-reload команд и скриптов без перезапуска
+- [x] TASK-007: Fast Path pipeline stabilization — LFS detection, model catalog `available` flag, intent fallback chain, slots normalization, `list_available_models` Tauri command (2026-03-14)
 
 ## 📋 Backlog — Phase B: Documentation
 
