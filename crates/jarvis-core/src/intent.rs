@@ -13,24 +13,33 @@ use crate::DB;
 
 static BACKEND: OnceCell<String> = OnceCell::new();
 
-pub async fn init(commands: &Vec<JCommandsList>) -> Result<(), String> {
+pub async fn init(commands: &[JCommandsList]) -> Result<(), String> {
     if BACKEND.get().is_some() {
         return Ok(());
     }
 
     let backend = DB.get().unwrap().read().intent_backend.clone();
 
-    BACKEND
-        .set(backend.clone())
-        .map_err(|_| "Backend already set")?;
+    // Helper: set BACKEND to "none" and log fallback reason.
+    // Used when a model binary is unavailable so the app continues with regex/fuzzy matching.
+    let set_fallback = |reason: &str| {
+        warn!(
+            "Intent classifier falling back to disabled mode: {}. \
+             Regex/fuzzy matching will handle command routing.",
+            reason
+        );
+        BACKEND.set("none".to_string()).ok(); // OnceCell — ignore if already set
+    };
 
     match backend.as_str() {
         "none" => {
             info!("Intent recognition disabled");
+            BACKEND.set(backend).map_err(|_| "Backend already set")?;
         }
         "intent-classifier" | "IntentClassifier" => {
             info!("Initializing IntentClassifier backend.");
-            intentclassifier::init(&commands).await?;
+            intentclassifier::init(commands).await?;
+            BACKEND.set(backend).map_err(|_| "Backend already set")?;
             info!("IntentClassifier backend initialized.");
         }
         // Legacy enum value — auto-select model by language (restores pre-registry behavior)
@@ -44,9 +53,16 @@ pub async fn init(commands: &Vec<JCommandsList>) -> Result<(), String> {
                 model_id,
                 crate::i18n::get_language()
             );
-            let model = models::embedding::load(models::registry(), model_id)?;
-            embeddingclassifier::init_with_model(model, &commands)?;
-            info!("EmbeddingClassifier backend initialized.");
+            match models::embedding::load(models::registry(), model_id) {
+                Ok(model) => {
+                    embeddingclassifier::init_with_model(model, commands)?;
+                    BACKEND.set(backend).map_err(|_| "Backend already set")?;
+                    info!("EmbeddingClassifier backend initialized.");
+                }
+                Err(e) => {
+                    set_fallback(&e);
+                }
+            }
         }
         // any other value is treated as an explicit model ID for embedding classification
         model_id => {
@@ -54,9 +70,17 @@ pub async fn init(commands: &Vec<JCommandsList>) -> Result<(), String> {
                 "Initializing EmbeddingClassifier with model '{}'.",
                 model_id
             );
-            let model = models::embedding::load(models::registry(), model_id)?;
-            embeddingclassifier::init_with_model(model, &commands)?;
-            info!("EmbeddingClassifier backend initialized.");
+            let model_id_owned = model_id.to_string();
+            match models::embedding::load(models::registry(), &model_id_owned) {
+                Ok(model) => {
+                    embeddingclassifier::init_with_model(model, commands)?;
+                    BACKEND.set(backend).map_err(|_| "Backend already set")?;
+                    info!("EmbeddingClassifier backend initialized.");
+                }
+                Err(e) => {
+                    set_fallback(&e);
+                }
+            }
         }
     }
 

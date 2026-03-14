@@ -135,11 +135,17 @@ fn main() -> Result<(), String> {
     let rt = Arc::new(tokio::runtime::Runtime::new().expect("Failed to create tokio runtime"));
 
     // init intent-recognition engine
+    // Non-fatal: if the selected model is unavailable the app falls back to
+    // regex/fuzzy matching.  A hard exit here would crash the app every time
+    // a model binary is a Git LFS pointer or has been deleted.
     let cmds_for_intent = command_registry::get_snapshot();
     rt.block_on(async {
         if let Err(e) = intent::init(&cmds_for_intent).await {
-            error!("Failed to initialize intent classifier: {}", e);
-            app::close(1);
+            warn!(
+                "Intent classifier init failed ({}). \
+                 Continuing without embedding classification — regex/fuzzy matching active.",
+                e
+            );
         }
     });
 
