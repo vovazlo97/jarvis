@@ -18,9 +18,9 @@
 ## Current State
 
 - **Version:** 0.2.0
-- **Active branch:** docs/phase-b-architecture
-- **Phase:** B — Documentation
-- **Last milestone:** Phase B complete — architecture.md, plugin.md, sdk.md, roadmap.md written; 67 tests pass; clippy clean (2026-03-14)
+- **Active branch:** feature/phase-c-skills-mcp
+- **Phase:** C — Skills + MCP
+- **Last milestone:** Phase B complete + Phase C skills committed — 5 project skills tracked in git (.claude/skills/), .gitignore updated with skill/rules exceptions (2026-03-14)
 
 ## Known Issues & Technical Debt
 

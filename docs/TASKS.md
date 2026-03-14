@@ -30,17 +30,21 @@
 - [x] TASK-011: Write plugin.md — command packs, Lua scripts, full API reference, sandbox levels, plugin.json schema, agent registry, slots, hot-reload (2026-03-14)
 - [x] TASK-012: Write sdk.md — WebSocket IPC protocol, Tauri invoke API, Rust crate integration, Event Bus, Command/Agent Registry, build commands (2026-03-14)
 
-## 📋 Backlog — Phase B: Documentation
+## 🎯 Current Sprint — Phase C: Skills + MCP
 
+### In Progress
+
+### Done
+
+- [x] TASK-020: Skill jarvis-architecture — load ADRs + Fast Path context before core changes (2026-03-14)
+- [x] TASK-021: Skill jarvis-fast-path-guardian — enforce Fast Path invariants before audio/STT changes (2026-03-14)
+- [x] TASK-022: Skill jarvis-doc-writer — update docs after feature implementation (2026-03-14)
+- [x] TASK-023: Skill jarvis-commit-bot — generate conventional commit messages (2026-03-14)
+- [x] TASK-024: Skill jarvis-plugin-scaffold — scaffold new plugin skeleton (2026-03-14)
 - [x] TASK-013: Create docs/roadmap.md — Phase A–E milestones, versioning, future Local AI section (2026-03-14)
 
 ## 📋 Backlog — Phase C: Skills + MCP
 
-- [ ] TASK-020: Create skill jarvis-architecture
-- [ ] TASK-021: Create skill jarvis-fast-path-guardian
-- [ ] TASK-022: Create skill jarvis-doc-writer
-- [ ] TASK-023: Create skill jarvis-commit-bot
-- [ ] TASK-024: Create skill jarvis-plugin-scaffold
 - [ ] TASK-025: Configure GitHub MCP server
 - [ ] TASK-026: Configure Filesystem MCP server
 
