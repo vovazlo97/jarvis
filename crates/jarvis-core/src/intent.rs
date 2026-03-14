@@ -28,12 +28,27 @@ pub async fn init(commands: &Vec<JCommandsList>) -> Result<(), String> {
         "none" => {
             info!("Intent recognition disabled");
         }
-        "intent-classifier" => {
+        "intent-classifier" | "IntentClassifier" => {
             info!("Initializing IntentClassifier backend.");
             intentclassifier::init(&commands).await?;
             info!("IntentClassifier backend initialized.");
         }
-        // any other value is treated as a model ID for embedding classification
+        // Legacy enum value — auto-select model by language (restores pre-registry behavior)
+        "EmbeddingClassifier" => {
+            let model_id = match crate::i18n::get_language().as_str() {
+                "en" => "all-MiniLM-L6-v2",
+                _ => "paraphrase-multilingual-MiniLM-L12-v2",
+            };
+            info!(
+                "EmbeddingClassifier (auto) → model '{}' (language: {}).",
+                model_id,
+                crate::i18n::get_language()
+            );
+            let model = models::embedding::load(models::registry(), model_id)?;
+            embeddingclassifier::init_with_model(model, &commands)?;
+            info!("EmbeddingClassifier backend initialized.");
+        }
+        // any other value is treated as an explicit model ID for embedding classification
         model_id => {
             info!(
                 "Initializing EmbeddingClassifier with model '{}'.",

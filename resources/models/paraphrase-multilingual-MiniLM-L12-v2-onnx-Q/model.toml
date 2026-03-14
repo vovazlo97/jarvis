@@ -1,0 +1,5 @@
+[model]
+id = "paraphrase-multilingual-MiniLM-L12-v2"
+name = "Paraphrase Multilingual MiniLM-L12-v2"
+tasks = ["intent"]
+description = "Multilingual sentence embedding model for intent classification"
