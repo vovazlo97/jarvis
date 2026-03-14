@@ -1,5 +1,4 @@
 use jarvis_core::commands::{self, JCommand, JCommandsList};
-use jarvis_core::{config, APP_DIR};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -51,7 +50,7 @@ pub struct NewCommandInput {
 /// Return all packs from disk (always fresh, never cached).
 #[tauri::command]
 pub fn list_command_packs() -> Vec<CommandPackInfo> {
-    let commands_path = APP_DIR.join(config::COMMANDS_PATH);
+    let commands_path = jarvis_core::config::user_commands_dir();
     let mut packs = Vec::new();
 
     let entries = match fs::read_dir(&commands_path) {
@@ -86,7 +85,7 @@ pub fn list_command_packs() -> Vec<CommandPackInfo> {
 #[tauri::command]
 pub fn create_command_pack(pack_name: String, command: NewCommandInput) -> Result<(), String> {
     let safe = sanitize_pack_name(&pack_name)?;
-    let pack_path = APP_DIR.join(config::COMMANDS_PATH).join(&safe);
+    let pack_path = jarvis_core::config::user_commands_dir().join(&safe);
     fs::create_dir_all(&pack_path)
         .map_err(|e| format!("Cannot create directory '{}': {}", safe, e))?;
 
@@ -160,7 +159,7 @@ pub fn delete_command(pack_name: String, command_id: String) -> Result<(), Strin
     }
 
     if list.commands.is_empty() {
-        let pack_path = APP_DIR.join(config::COMMANDS_PATH).join(&pack_name);
+        let pack_path = jarvis_core::config::user_commands_dir().join(&pack_name);
         let _ = fs::remove_dir_all(&pack_path);
         return Ok(());
     }
@@ -172,7 +171,7 @@ pub fn delete_command(pack_name: String, command_id: String) -> Result<(), Strin
 #[tauri::command]
 pub fn delete_command_pack(pack_name: String) -> Result<(), String> {
     validate_name(&pack_name)?;
-    let pack_path = APP_DIR.join(config::COMMANDS_PATH).join(&pack_name);
+    let pack_path = jarvis_core::config::user_commands_dir().join(&pack_name);
     if !pack_path.exists() {
         return Err(format!("Pack '{}' not found", pack_name));
     }
@@ -202,8 +201,7 @@ fn validate_name(name: &str) -> Result<(), String> {
 }
 
 fn pack_toml_path(pack_name: &str) -> PathBuf {
-    APP_DIR
-        .join(config::COMMANDS_PATH)
+    jarvis_core::config::user_commands_dir()
         .join(pack_name)
         .join("command.toml")
 }
@@ -295,4 +293,66 @@ fn build_toml(cmd: &NewCommandInput) -> String {
     }
 
     lines.join("\n") + "\n"
+}
+
+/// Copy all bundled command packs to the user commands directory on first run.
+/// Skips seeding if user dir already has any content.
+/// This allows the user to see and edit default packs from the GUI.
+pub fn seed_user_commands() {
+    use jarvis_core::config::{user_commands_dir, COMMANDS_PATH};
+    use jarvis_core::APP_DIR;
+
+    let user_dir = user_commands_dir();
+
+    // Skip if user dir already has packs
+    if user_dir.exists() {
+        let has_content = fs::read_dir(&user_dir)
+            .map(|mut d| d.next().is_some())
+            .unwrap_or(false);
+        if has_content {
+            return;
+        }
+    }
+
+    let bundled_dir = APP_DIR.join(COMMANDS_PATH);
+    if !bundled_dir.exists() {
+        return;
+    }
+
+    if let Err(e) = fs::create_dir_all(&user_dir) {
+        eprintln!("Seed: cannot create user commands dir: {}", e);
+        return;
+    }
+
+    let entries = match fs::read_dir(&bundled_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let src_pack = entry.path();
+        let pack_name = entry.file_name();
+        let dst_pack = user_dir.join(&pack_name);
+        if src_pack.is_dir() && src_pack.join("command.toml").exists() {
+            if let Err(e) = copy_dir_recursive(&src_pack, &dst_pack) {
+                eprintln!("Seed: failed to copy pack {:?}: {}", pack_name, e);
+            }
+        }
+    }
+
+    eprintln!("[STARTUP] Seeded user commands directory from bundled defaults");
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let dst_path = dst.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_dir_recursive(&entry.path(), &dst_path)?;
+        } else {
+            fs::copy(&entry.path(), &dst_path)?;
+        }
+    }
+    Ok(())
 }
