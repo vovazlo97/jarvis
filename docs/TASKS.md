@@ -16,6 +16,12 @@ _(Phase A complete — see Done below)_
 - [x] TASK-005: Extract Fast Path boundary into separate module
 - [x] TASK-006: Hot-reload команд и скриптов без перезапуска
 - [x] TASK-007: Fast Path pipeline stabilization — LFS detection, model catalog `available` flag, intent fallback chain, slots normalization, `list_available_models` Tauri command (2026-03-14)
+- [x] TASK-008: User data persistence — two-layer data model (bundled + user), `user_commands_dir()`/`user_scripts_dir()` in config.rs, `parse_commands_from_dirs()` + `parse_scripts_from_dirs()` merge, GUI CRUD writes to user layer, first-run seeding; 67 tests pass (2026-03-14)
+  - [x] TASK-008-1: `user_commands_dir()` / `user_scripts_dir()` in config.rs
+  - [x] TASK-008-2: `parse_commands_from_dirs()` merge in jarvis-core
+  - [x] TASK-008-3: `parse_scripts_from_dirs()` merge in jarvis-core
+  - [x] TASK-008-4: GUI commands CRUD → user dir + `seed_user_commands()`
+  - [x] TASK-008-5: GUI scripts CRUD → user dir + graceful fallback in `parse_scripts()`
 
 ## 📋 Backlog — Phase B: Documentation
 
