@@ -23,46 +23,81 @@ use crate::{config, i18n, APP_DIR};
 #[cfg(feature = "lua")]
 use crate::lua::{self, CommandContext, SandboxLevel};
 
-pub fn parse_commands() -> Result<Vec<JCommandsList>, String> {
-    let mut commands: Vec<JCommandsList> = Vec::new();
+/// Core merge logic — reads command packs from two directories.
+/// User packs override bundled packs with the same folder name.
+/// Missing directories are silently skipped (no panic).
+pub fn parse_commands_from_dirs(bundled_dir: &Path, user_dir: &Path) -> Vec<JCommandsList> {
+    let mut packs: std::collections::HashMap<String, JCommandsList> =
+        std::collections::HashMap::new();
 
-    let commands_path = APP_DIR.join(config::COMMANDS_PATH);
-    let cmd_dirs = fs::read_dir(&commands_path).map_err(|e| {
-        format!(
-            "Error reading commands directory {:?}: {}",
-            commands_path, e
-        )
-    })?;
-
-    for entry in cmd_dirs.flatten() {
-        let cmd_path = entry.path();
-        let toml_file = cmd_path.join("command.toml");
-
-        if !toml_file.exists() {
-            continue;
+    // Load bundled packs first (lower priority)
+    if let Ok(entries) = fs::read_dir(bundled_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let toml_file = path.join("command.toml");
+            if !toml_file.exists() {
+                continue;
+            }
+            let pack_name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            if let Some(list) = load_pack(&path, &toml_file) {
+                packs.insert(pack_name, list);
+            }
         }
-
-        let content = match fs::read_to_string(&toml_file) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Failed to read {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
-
-        let file: JCommandsList = match toml::from_str(&content) {
-            Ok(f) => f,
-            Err(e) => {
-                warn!("Failed to parse {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
-
-        commands.push(JCommandsList {
-            path: cmd_path,
-            commands: file.commands,
-        });
     }
+
+    // Load user packs second — overrides bundled packs with same name
+    if user_dir.exists() {
+        if let Ok(entries) = fs::read_dir(user_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let toml_file = path.join("command.toml");
+                if !toml_file.exists() {
+                    continue;
+                }
+                let pack_name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                if let Some(list) = load_pack(&path, &toml_file) {
+                    packs.insert(pack_name, list);
+                }
+            }
+        }
+    }
+
+    packs.into_values().collect()
+}
+
+fn load_pack(pack_path: &Path, toml_file: &Path) -> Option<JCommandsList> {
+    let content = match fs::read_to_string(toml_file) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("Failed to read {}: {}", toml_file.display(), e);
+            return None;
+        }
+    };
+    match toml::from_str::<JCommandsList>(&content) {
+        Ok(file) => Some(JCommandsList {
+            path: pack_path.to_path_buf(),
+            commands: file.commands,
+        }),
+        Err(e) => {
+            warn!("Failed to parse {}: {}", toml_file.display(), e);
+            None
+        }
+    }
+}
+
+pub fn parse_commands() -> Result<Vec<JCommandsList>, String> {
+    let bundled_dir = APP_DIR.join(config::COMMANDS_PATH);
+    let user_dir = config::user_commands_dir();
+
+    let commands = parse_commands_from_dirs(&bundled_dir, &user_dir);
 
     if commands.is_empty() {
         Err("No commands found".into())
@@ -550,5 +585,87 @@ mod tests {
     fn test_unknown_type_is_err() {
         let cmd = cmd_from_toml("id = \"unk\"\ntype = \"totally_unknown\"\n");
         assert!(execute_command(&PathBuf::from("/t"), &cmd, None, None).is_err());
+    }
+
+    fn write_command_toml(dir: &std::path::Path, id: &str) {
+        let content = format!(
+            "[[commands]]\nid = \"{}\"\ntype = \"cli\"\ncli_cmd = \"echo\"\nsounds.ru = [\"ok1\"]\n",
+            id
+        );
+        fs::write(dir.join("command.toml"), content).unwrap();
+    }
+
+    /// User pack with same name as bundled must override bundled.
+    #[test]
+    fn user_pack_overrides_bundled_same_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+
+        let b_games = bundled.join("games");
+        fs::create_dir_all(&b_games).unwrap();
+        write_command_toml(&b_games, "witcher");
+
+        let u_games = user.join("games");
+        fs::create_dir_all(&u_games).unwrap();
+        write_command_toml(&u_games, "cyberpunk");
+
+        let result = parse_commands_from_dirs(&bundled, &user);
+        let ids: Vec<_> = result
+            .iter()
+            .flat_map(|l| l.commands.iter().map(|c| c.id.as_str()))
+            .collect();
+        assert!(
+            ids.contains(&"cyberpunk"),
+            "user pack must override bundled"
+        );
+        assert!(
+            !ids.contains(&"witcher"),
+            "bundled pack must be overridden by user"
+        );
+    }
+
+    /// Unique user pack (not in bundled) must appear in merged result.
+    #[test]
+    fn unique_user_pack_included() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("user");
+        fs::create_dir_all(&bundled).unwrap();
+
+        let u_custom = user.join("my-custom");
+        fs::create_dir_all(&u_custom).unwrap();
+        write_command_toml(&u_custom, "my-cmd");
+
+        let b_default = bundled.join("default");
+        fs::create_dir_all(&b_default).unwrap();
+        write_command_toml(&b_default, "default-cmd");
+
+        let result = parse_commands_from_dirs(&bundled, &user);
+        let ids: Vec<_> = result
+            .iter()
+            .flat_map(|l| l.commands.iter().map(|c| c.id.as_str()))
+            .collect();
+        assert!(ids.contains(&"my-cmd"), "user-only pack must be included");
+        assert!(
+            ids.contains(&"default-cmd"),
+            "bundled-only pack must be included"
+        );
+    }
+
+    /// Non-existent user dir must not panic — silently skip.
+    #[test]
+    fn missing_user_dir_is_ok() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundled = tmp.path().join("bundled");
+        let user = tmp.path().join("nonexistent_user");
+        fs::create_dir_all(&bundled).unwrap();
+
+        let b_pack = bundled.join("pack");
+        fs::create_dir_all(&b_pack).unwrap();
+        write_command_toml(&b_pack, "cmd");
+
+        let result = parse_commands_from_dirs(&bundled, &user);
+        assert_eq!(result.len(), 1);
     }
 }
