@@ -9,13 +9,14 @@
 | ADR-003 | Plugin Manifest required | Standardized plugin lifecycle | 2026-03-13 |
 | ADR-004 | Scripts via live disk reads | No stale cache, instant delete takes effect | 2026-03-08 |
 | ADR-005 | Hot-reload via IpcAction::ReloadCommands | Existing WebSocket IPC path used — no new Event Bus events needed; scripts virtual cmds merged into intent reinit; EmbeddingClassifier supports hot-swap via RwLock | 2026-03-14 |
+| ADR-006 | Fast Path lives in fast_path.rs module | Clear latency boundary; all <250ms code is auditable in one module with hard-constraint doc block | 2026-03-14 |
 
 ## Current State
 
 - **Version:** 0.1.0
 - **Active branch:** develop/phase-a-core-stabilization
 - **Phase:** A — Core Stabilization
-- **Last milestone:** TASK-003+004 Plugin Manifest + Agent Registry — plugin::manifest with serde/validate/scan, agent_registry with RwLock HashMap; 48 core tests pass (2026-03-14)
+- **Last milestone:** Phase A complete — TASK-005 Fast Path extracted to fast_path.rs (450 lines, app.rs→187 lines); all Phase A tasks done; 49 tests pass (2026-03-14)
 
 ## Known Issues & Technical Debt
 

@@ -4,7 +4,7 @@
 
 ### In Progress
 
-- [ ] TASK-005: Extract Fast Path boundary into separate module
+_(Phase A complete — see Done below)_
 
 ### Done
 
@@ -13,6 +13,7 @@
 - [x] TASK-002: Refactor Command Registry with atomic writes
 - [x] TASK-003: Define Plugin Manifest schema (plugin.json)
 - [x] TASK-004: Define Agent Registry schema
+- [x] TASK-005: Extract Fast Path boundary into separate module
 - [x] TASK-006: Hot-reload команд и скриптов без перезапуска
 
 ## 📋 Backlog — Phase B: Documentation
