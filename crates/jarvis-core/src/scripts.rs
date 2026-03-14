@@ -311,9 +311,7 @@ fn exec_command_ref(step: &ScriptStep) -> Result<(), String> {
         }
 
         if let Some(cmd) = cmd_list.commands.iter().find(|c| c.id == step.command_id) {
-            return crate::commands::execute_command(&cmd_list.path, cmd, None, None)
-                .map(|_| ())
-                .map_err(|e| e);
+            return crate::commands::execute_command(&cmd_list.path, cmd, None, None).map(|_| ());
         }
     }
 
