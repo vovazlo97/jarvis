@@ -23,18 +23,15 @@
 
 ### In Progress
 
-- [ ] TASK-009: Fix 40 `cargo clippy -D warnings` violations — MutexGuard across await (HIGH), &PathBuf→&Path, derivable_impls, dead code, unused imports (jarvis-core, jarvis-gui, jarvis-app)
-
 ### Done
 
+- [x] TASK-009: Fix 40 `cargo clippy -D warnings` violations — MutexGuard across await, &PathBuf→&Path, derivable_impls, dead code, unused imports; commit dd67850 (2026-03-14)
 - [x] TASK-010: Write architecture.md — crate map, Fast Path pipeline, Event Bus, Command Registry, Plugin System, Data Storage, Model Catalog, ADR summary (2026-03-14)
+- [x] TASK-011: Write plugin.md — command packs, Lua scripts, full API reference, sandbox levels, plugin.json schema, agent registry, slots, hot-reload (2026-03-14)
 
 ## 📋 Backlog — Phase B: Documentation
 
-- [ ] TASK-011: Write plugin.md (SDK docs)
 - [ ] TASK-012: Write sdk.md
-- [ ] TASK-013: Create docs/tasks/roadmap.md
-- [ ] TASK-011: Write plugin.md (SDK docs)
 - [ ] TASK-012: Write sdk.md
 - [ ] TASK-013: Create docs/tasks/roadmap.md
 

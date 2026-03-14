@@ -27,7 +27,7 @@
 | Task | Issue | Notes | Status |
 |---|---|---|---|
 | ~~TASK-006~~ | ~~Hot-reload не работает~~ | Root cause найден: intent::reinit() silently skipped embedding backend | Закрыт |
-| TASK-009 (new) | `cargo clippy -D warnings` fails — 40 violations in jarvis-core | &PathBuf→&Path, derivable_impls, redundant &*, MutexGuard across await (HIGH), unused imports; GUI/app: dead code, unused imports | В работе (rust-engineer) |
+| ~~TASK-009~~ | ~~`cargo clippy -D warnings` fails — 40 violations~~ | Исправлено: MutexGuard await, &PathBuf→&Path, derivable_impls, dead code; commit dd67850 | Закрыт |
 
 ## Key Contacts & Context
 
