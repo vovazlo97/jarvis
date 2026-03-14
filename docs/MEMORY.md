@@ -15,7 +15,7 @@
 - **Version:** 0.1.0
 - **Active branch:** develop/phase-a-core-stabilization
 - **Phase:** A — Core Stabilization
-- **Last milestone:** TASK-006 Hot-reload complete — EmbeddingClassifier reinit implemented (OnceCell→RwLock), intent::reinit routes embedding arm; all 36 core tests pass (2026-03-14)
+- **Last milestone:** TASK-003+004 Plugin Manifest + Agent Registry — plugin::manifest with serde/validate/scan, agent_registry with RwLock HashMap; 48 core tests pass (2026-03-14)
 
 ## Known Issues & Technical Debt
 
