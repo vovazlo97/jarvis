@@ -50,7 +50,7 @@ pub async fn init(commands: &Vec<JCommandsList>) -> Result<(), String> {
 
 /// Retrain the intent classifier with a new commands list.
 /// Safe to call at runtime — replaces the model without restarting audio pipeline.
-/// Only the intent-classifier backend supports hot-reload; embedding classifier is skipped.
+/// Supports both intent-classifier and embedding backends.
 pub async fn reinit(commands: &[JCommandsList]) -> Result<(), String> {
     match BACKEND.get().map(|s| s.as_str()) {
         Some("intent-classifier") => {
@@ -58,8 +58,12 @@ pub async fn reinit(commands: &[JCommandsList]) -> Result<(), String> {
             intentclassifier::reinit(commands).await?;
             info!("IntentClassifier retrained successfully.");
         }
+        Some("none") | None => {
+            // intent recognition disabled or not yet initialised — skip
+        }
         _ => {
-            // none or embedding backends — no hot-reload support, skip silently
+            // embedding backend: rebuild intent vectors, keep loaded model
+            embeddingclassifier::reinit(commands)?;
         }
     }
     Ok(())

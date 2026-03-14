@@ -2,16 +2,16 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 
 use crate::commands::JCommandsList;
 use crate::i18n;
 use crate::models::embedding::EmbeddingModel;
 use crate::APP_CONFIG_DIR;
 
-// no outer Mutex needed - state is immutable after init.
-// the embedding model has its own internal Mutex.
-static CLASSIFIER: OnceCell<EmbeddingClassifierState> = OnceCell::new();
+// RwLock allows hot-reload via reinit() — replacing intents while keeping the model.
+static CLASSIFIER: Lazy<RwLock<Option<EmbeddingClassifierState>>> = Lazy::new(|| RwLock::new(None));
 
 struct IntentVector {
     id: String,
@@ -23,7 +23,7 @@ struct EmbeddingClassifierState {
     intents: Vec<IntentVector>,
 }
 
-// model is Arc (Send+Sync), intents are read-only after init
+// model is Arc (Send+Sync via internal Mutex), intents are plain data
 unsafe impl Send for EmbeddingClassifierState {}
 unsafe impl Sync for EmbeddingClassifierState {}
 
@@ -35,7 +35,7 @@ pub fn init_with_model(
     model: Arc<EmbeddingModel>,
     commands: &[JCommandsList],
 ) -> Result<(), String> {
-    if CLASSIFIER.get().is_some() {
+    if CLASSIFIER.read().is_some() {
         return Ok(());
     }
 
@@ -73,10 +73,42 @@ pub fn init_with_model(
 
     info!("Embedding classifier ready with {} intents", intents.len());
 
-    CLASSIFIER
-        .set(EmbeddingClassifierState { model, intents })
-        .map_err(|_| "Classifier already set".to_string())?;
+    *CLASSIFIER.write() = Some(EmbeddingClassifierState { model, intents });
 
+    Ok(())
+}
+
+/// Hot-reload: rebuild intent vectors from updated commands, keeping the loaded model.
+/// Safe to call at runtime — replaces intents without restarting the audio pipeline.
+/// No-op if the classifier has not been initialized (model not found at startup).
+pub fn reinit(commands: &[JCommandsList]) -> Result<(), String> {
+    // Borrow model Arc cheaply before dropping the read lock.
+    let model = {
+        let guard = CLASSIFIER.read();
+        match guard.as_ref() {
+            Some(state) => Arc::clone(&state.model),
+            None => return Ok(()), // not initialized — skip silently
+        }
+    };
+
+    info!("Retraining EmbeddingClassifier with updated commands...");
+
+    let current_hash = crate::commands::commands_hash(commands);
+    let config_dir = APP_CONFIG_DIR.get().ok_or("Config dir not set")?;
+    let hash_path = config_dir.join(HASH_FILE);
+    let cache_path = config_dir.join(CACHE_FILE);
+
+    let new_intents = build_intent_vectors(&model, commands)?;
+
+    // update disk cache so next startup avoids re-embedding
+    if let Ok(json) = serde_json::to_string(&intents_to_cache(&new_intents)) {
+        let _ = fs::write(&cache_path, json);
+        let _ = fs::write(&hash_path, &current_hash);
+    }
+
+    CLASSIFIER.write().as_mut().unwrap().intents = new_intents;
+
+    info!("EmbeddingClassifier retrained successfully.");
     Ok(())
 }
 
@@ -136,7 +168,10 @@ fn build_intent_vectors(
 }
 
 pub fn classify(text: &str) -> Result<(String, f64), String> {
-    let state = CLASSIFIER.get().ok_or("Classifier not initialized")?;
+    let guard = CLASSIFIER.read();
+    let state = guard
+        .as_ref()
+        .ok_or_else(|| "Classifier not initialized".to_string())?;
 
     // only the embedding model needs locking, intents are read-only
     let embeddings = state
@@ -216,4 +251,20 @@ fn load_cached_intents(path: &PathBuf) -> Result<Vec<IntentVector>, String> {
             vector: c.vector,
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// reinit must not panic and must return Ok when classifier has not been
+    /// initialized (e.g. model files not present at test time).
+    #[test]
+    fn reinit_returns_ok_when_not_initialized() {
+        let result = reinit(&[]);
+        assert!(
+            result.is_ok(),
+            "reinit should succeed even when not initialized"
+        );
+    }
 }
