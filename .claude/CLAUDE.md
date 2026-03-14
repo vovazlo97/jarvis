@@ -91,6 +91,24 @@ error-detective + /systematic-debugging → rust-engineer (фикс) → /verifi
 - /jarvis-fast-path-guardian ВСЕГДА после rust-engineer если касаемся audio/STT
 - error-detective только диагностирует → передаёт задачу rust-engineer
 
+### Skill Creation Rule
+
+Когда нужно создать новый скилл для проекта:
+1. Использовать `skill-creator` плагин (`claude plugin install skill-creator@claude-plugins-official`)
+2. `skill-creator` проведёт интервью → создаст SKILL.md с правильной структурой:
+   - YAML frontmatter: `name`, `description` (trigger condition)
+   - Конкретные инструкции (что делать шаг за шагом)
+   - Output format (что выводить в конце)
+3. Сохранить результат в `.claude/skills/<skill-name>/SKILL.md`
+4. Зарегистрировать в таблице скиллов выше и в `.claude/CLAUDE.md`
+
+**Стандарт качества для каждого скилла:**
+- `description` — чёткий trigger condition, достаточно "pushy" чтобы не under-trigger
+- Инструкции — конкретные шаги с командами, не абстрактные советы
+- Output format — явный шаблон вывода в конце
+- Нет дублирования с другими скиллами
+- Соответствует архитектуре Jarvis (Fast Path, Event Bus, Rust/Tauri)
+
 ## 5. MCP Servers
 
 ```
@@ -166,7 +184,6 @@ Currently active: `context7` (library docs), `serena` (symbol analysis)
 
 ---
 
-Закоммить: docs(claude): integrate rust-engineer, architecture-modernizer, error-detective, ai-engineer agents into CLAUDE.md routing
 ## 9. Performance Contracts
 
 | Metric | Target | Test |

@@ -45,6 +45,12 @@ resources/vosk-api-*
 
 # ── Internal / Dev files ──────────────────────────────────────────────────────
 .claude/
+# Track project-level skills and rules (shared with contributors)
+!.claude/CLAUDE.md
+!.claude/skills/
+!.claude/skills/**
+!.claude/rules/
+!.claude/rules/**
 .serena/
 CLAUDE.md
 tsk.md
