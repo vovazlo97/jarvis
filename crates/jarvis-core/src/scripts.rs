@@ -134,7 +134,7 @@ pub fn parse_scripts() -> Vec<Script> {
     let bundled = APP_DIR.join("resources/scripts");
     let user = config::user_scripts_dir();
     info!(
-        "[DEBUG_FIX] parse_scripts() scanning bundled: {:?}, user: {:?}",
+        "parse_scripts() scanning bundled: {:?}, user: {:?}",
         bundled, user
     );
     parse_scripts_from_dirs(&bundled, &user)
