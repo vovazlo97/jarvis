@@ -20,7 +20,7 @@
 - **Version:** 0.2.0
 - **Active branch:** docs/phase-b-architecture
 - **Phase:** B — Documentation
-- **Last milestone:** TASK-010 architecture.md written — crate map, Fast Path pipeline, Event Bus, Command Registry, Plugin System, Data Storage, Model Catalog, ADR summary (2026-03-14)
+- **Last milestone:** Phase B complete — architecture.md, plugin.md, sdk.md, roadmap.md written; 67 tests pass; clippy clean (2026-03-14)
 
 ## Known Issues & Technical Debt
 
