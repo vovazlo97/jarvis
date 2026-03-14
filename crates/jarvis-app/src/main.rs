@@ -17,6 +17,7 @@ mod log;
 
 // include app
 mod app;
+mod fast_path;
 
 // include tray
 // @TODO. macOS currently not supported for tray functionality.
