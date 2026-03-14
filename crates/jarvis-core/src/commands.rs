@@ -294,8 +294,8 @@ pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
 pub fn execute_command(
     cmd_path: &PathBuf,
     cmd_config: &JCommand,
-    phrase: Option<&str>,
-    slots: Option<&HashMap<String, SlotValue>>,
+    _phrase: Option<&str>,
+    _slots: Option<&HashMap<String, SlotValue>>,
 ) -> Result<bool, String> {
     // execute command by the type
     match cmd_config.cmd_type.as_str() {
@@ -304,7 +304,7 @@ pub fn execute_command(
 
         // LUA command
         #[cfg(feature = "lua")]
-        "lua" => execute_lua_command(cmd_path, cmd_config, phrase, slots),
+        "lua" => execute_lua_command(cmd_path, cmd_config, _phrase, _slots),
 
         // Direct executable launch (games, apps)
         // Uses exe's own directory as working dir so DLL lookups succeed
