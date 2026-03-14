@@ -2,10 +2,6 @@
 
 ## 🎯 Current Sprint — Phase A: Core Stabilization
 
-### In Progress
-
-_(Phase A complete — see Done below)_
-
 ### Done
 
 - [x] TASK-000: Create .claude/ infrastructure + CLAUDE.md + MEMORY.md + TASKS.md
@@ -23,12 +19,20 @@ _(Phase A complete — see Done below)_
   - [x] TASK-008-4: GUI commands CRUD → user dir + `seed_user_commands()`
   - [x] TASK-008-5: GUI scripts CRUD → user dir + graceful fallback in `parse_scripts()`
 
+## 🎯 Current Sprint — Phase B: Documentation
+
+### In Progress
+
+### Done
+
+- [x] TASK-009: Fix 40 `cargo clippy -D warnings` violations — MutexGuard across await, &PathBuf→&Path, derivable_impls, dead code, unused imports; commit dd67850 (2026-03-14)
+- [x] TASK-010: Write architecture.md — crate map, Fast Path pipeline, Event Bus, Command Registry, Plugin System, Data Storage, Model Catalog, ADR summary (2026-03-14)
+- [x] TASK-011: Write plugin.md — command packs, Lua scripts, full API reference, sandbox levels, plugin.json schema, agent registry, slots, hot-reload (2026-03-14)
+- [x] TASK-012: Write sdk.md — WebSocket IPC protocol, Tauri invoke API, Rust crate integration, Event Bus, Command/Agent Registry, build commands (2026-03-14)
+
 ## 📋 Backlog — Phase B: Documentation
 
-- [ ] TASK-010: Write architecture.md
-- [ ] TASK-011: Write plugin.md (SDK docs)
-- [ ] TASK-012: Write sdk.md
-- [ ] TASK-013: Create docs/tasks/roadmap.md
+- [x] TASK-013: Create docs/roadmap.md — Phase A–E milestones, versioning, future Local AI section (2026-03-14)
 
 ## 📋 Backlog — Phase C: Skills + MCP
 

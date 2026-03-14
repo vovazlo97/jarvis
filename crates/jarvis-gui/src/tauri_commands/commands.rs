@@ -351,7 +351,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
         if entry.path().is_dir() {
             copy_dir_recursive(&entry.path(), &dst_path)?;
         } else {
-            fs::copy(&entry.path(), &dst_path)?;
+            fs::copy(entry.path(), &dst_path)?;
         }
     }
     Ok(())

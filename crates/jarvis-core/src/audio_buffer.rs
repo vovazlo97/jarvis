@@ -35,6 +35,10 @@ impl AudioRingBuffer {
         self.buffer.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
     pub fn clear(&mut self) {
         self.buffer.clear();
     }

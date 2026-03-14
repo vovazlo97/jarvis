@@ -9,7 +9,7 @@ use crate::{config, DB, SOUND_DIR};
 
 static AUDIO_TYPE: OnceCell<AudioType> = OnceCell::new();
 
-pub fn init() -> Result<(), ()> {
+pub fn init() -> Result<(), String> {
     if AUDIO_TYPE.get().is_some() {
         return Ok(());
     } // already initialized
@@ -31,7 +31,7 @@ pub fn init() -> Result<(), ()> {
                 Err(()) => {
                     error!("Failed to initialize Rodio audio backend.");
 
-                    return Err(());
+                    return Err("Failed to initialize Rodio audio backend".to_string());
                 }
             }
         }
@@ -46,7 +46,7 @@ pub fn init() -> Result<(), ()> {
                 Err(_msg) => {
                     error!("Failed to initialize Kira audio backend.");
 
-                    return Err(());
+                    return Err("Failed to initialize Kira audio backend".to_string());
                 }
             }
         }

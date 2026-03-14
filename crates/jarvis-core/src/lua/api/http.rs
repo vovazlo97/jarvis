@@ -34,10 +34,8 @@ pub fn register(lua: &Lua, jarvis: &Table) -> mlua::Result<()> {
             header_map.insert("Content-Type".to_string(), "application/json".to_string());
 
             if let Some(h) = headers {
-                for pair in h.pairs::<String, String>() {
-                    if let Ok((k, v)) = pair {
-                        header_map.insert(k, v);
-                    }
+                for (k, v) in h.pairs::<String, String>().flatten() {
+                    header_map.insert(k, v);
                 }
             }
 

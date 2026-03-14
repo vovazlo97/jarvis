@@ -73,7 +73,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
 
         recorder::read_microphone(&mut frame_buffer);
         audio_chunk_count += 1;
-        if audio_chunk_count % AUDIO_LOG_INTERVAL == 0 {
+        if audio_chunk_count.is_multiple_of(AUDIO_LOG_INTERVAL) {
             debug!(
                 "[Audio] chunk #{} received ({} samples), vad_state={:?}",
                 audio_chunk_count,

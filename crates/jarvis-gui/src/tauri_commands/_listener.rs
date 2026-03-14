@@ -117,7 +117,7 @@ fn keyword_callback(_keyword_index: i32) {
 
     // emit assistant greet event
     TAURI_APP_HANDLE.get().unwrap()
-        .emit_all(events::EventTypes::AssistantGreet.get(), ())
+        .emit_all(events::EventTypes::AssistantGreet.as_str(), ())
         .unwrap();
 
     // the loop
@@ -170,7 +170,7 @@ fn keyword_callback(_keyword_index: i32) {
                     }
 
                     TAURI_APP_HANDLE.get().unwrap()
-                        .emit_all(events::EventTypes::AssistantWaiting.get(), ())
+                        .emit_all(events::EventTypes::AssistantWaiting.as_str(), ())
                         .unwrap();
                     break; // return to picovoice after command execution (no matter successfull or not)
                 }
@@ -181,7 +181,7 @@ fn keyword_callback(_keyword_index: i32) {
             Ok(elapsed) if elapsed > config::CMS_WAIT_DELAY => {
                 // return to picovoice after N seconds
                 TAURI_APP_HANDLE.get().unwrap()
-                    .emit_all(events::EventTypes::AssistantWaiting.get(), ())
+                    .emit_all(events::EventTypes::AssistantWaiting.as_str(), ())
                     .unwrap();
                 break;
             }

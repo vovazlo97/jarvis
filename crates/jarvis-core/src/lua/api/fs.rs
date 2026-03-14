@@ -9,12 +9,12 @@ use crate::lua::sandbox::SandboxLevel;
 pub fn register(
     lua: &Lua,
     jarvis: &Table,
-    command_path: &PathBuf,
+    command_path: &Path,
     sandbox: SandboxLevel,
 ) -> mlua::Result<()> {
     let fs_table = lua.create_table()?;
 
-    let cmd_path = command_path.clone();
+    let cmd_path = command_path.to_path_buf();
     let sandbox_level = sandbox;
 
     // jarvis.fs.read(path)
@@ -35,7 +35,7 @@ pub fn register(
         let bytes =
             fs::read(&full_path).map_err(|e| mlua::Error::runtime(format!("Read error: {}", e)))?;
 
-        Ok(lua.create_string(&bytes)?)
+        lua.create_string(&bytes)
     })?;
     fs_table.set("read_bytes", read_bytes_fn)?;
 
@@ -123,17 +123,15 @@ pub fn register(
             .map_err(|e| mlua::Error::runtime(format!("List error: {}", e)))?;
 
         let mut idx = 1;
-        for entry in entries {
-            if let Ok(entry) = entry {
-                let item = lua.create_table()?;
-                item.set("name", entry.file_name().to_string_lossy().to_string())?;
-                item.set("path", entry.path().to_string_lossy().to_string())?;
-                item.set("is_file", entry.path().is_file())?;
-                item.set("is_dir", entry.path().is_dir())?;
+        for entry in entries.flatten() {
+            let item = lua.create_table()?;
+            item.set("name", entry.file_name().to_string_lossy().to_string())?;
+            item.set("path", entry.path().to_string_lossy().to_string())?;
+            item.set("is_file", entry.path().is_file())?;
+            item.set("is_dir", entry.path().is_dir())?;
 
-                result.set(idx, item)?;
-                idx += 1;
-            }
+            result.set(idx, item)?;
+            idx += 1;
         }
 
         Ok(result)
@@ -183,11 +181,7 @@ pub fn register(
 }
 
 // Resolve path relative to command folder, with sandbox checks
-fn resolve_path(
-    command_path: &PathBuf,
-    path: &str,
-    sandbox: SandboxLevel,
-) -> mlua::Result<PathBuf> {
+fn resolve_path(command_path: &Path, path: &str, sandbox: SandboxLevel) -> mlua::Result<PathBuf> {
     let path = Path::new(path);
 
     // if absolute path, check sandbox allows it
@@ -208,7 +202,7 @@ fn resolve_path(
 
     let cmd_canonical = command_path
         .canonicalize()
-        .unwrap_or_else(|_| command_path.clone());
+        .unwrap_or_else(|_| command_path.to_path_buf());
 
     if !sandbox.allows_expanded_paths() && !canonical.starts_with(&cmd_canonical) {
         return Err(mlua::Error::runtime("Path escapes command folder"));

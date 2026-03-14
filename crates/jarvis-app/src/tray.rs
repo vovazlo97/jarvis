@@ -1,14 +1,10 @@
 mod menu;
 
-use image;
 use std::process::Command;
 use tray_icon::{menu::MenuEvent, TrayIconBuilder};
 
-#[cfg(target_os = "windows")]
-use winit::platform::windows::EventLoopBuilderExtWindows;
-
 use jarvis_core::{
-    config, i18n,
+    i18n,
     ipc::{self, IpcEvent},
     voices, SettingsManager,
 };
@@ -85,8 +81,6 @@ pub fn init_blocking(settings: SettingsManager) {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
     }
-
-    info!("Tray initialized.");
 }
 
 fn handle_menu_event(event: &MenuEvent, settings: &SettingsManager, tray_state: &menu::TrayState) {
@@ -128,20 +122,17 @@ fn handle_menu_event(event: &MenuEvent, settings: &SettingsManager, tray_state: 
 
     // -- toggle: "toggle:key"
     if let Some(key) = id.strip_prefix("toggle:") {
-        match key {
-            "gain_normalizer" => {
-                // CheckMenuItem auto-toggles on click, just read the new state
-                let new_val = tray_state.gain_toggle.is_checked();
-                let val_str = if new_val { "true" } else { "false" };
-                if let Err(e) = settings.write(key, val_str) {
-                    warn!("Tray: failed to toggle {}: {}", key, e);
-                    // revert visual state on error
-                    tray_state.gain_toggle.set_checked(!new_val);
-                } else {
-                    info!("Tray: {} = {}", key, val_str);
-                }
+        if key == "gain_normalizer" {
+            // CheckMenuItem auto-toggles on click, just read the new state
+            let new_val = tray_state.gain_toggle.is_checked();
+            let val_str = if new_val { "true" } else { "false" };
+            if let Err(e) = settings.write(key, val_str) {
+                warn!("Tray: failed to toggle {}: {}", key, e);
+                // revert visual state on error
+                tray_state.gain_toggle.set_checked(!new_val);
+            } else {
+                info!("Tray: {} = {}", key, val_str);
             }
-            _ => {}
         }
         return;
     }
@@ -182,7 +173,7 @@ fn restart_app() {
     };
 
     match Command::new(&exe_path).spawn() {
-        Ok(_) => {
+        Ok(_child) => {
             info!("Spawned new instance, exiting current...");
             std::process::exit(0);
         }
@@ -219,7 +210,7 @@ fn launch_gui() {
     info!("Launching GUI: {:?}", gui_path);
 
     match Command::new(&gui_path).spawn() {
-        Ok(_) => info!("Launched jarvis-gui"),
+        Ok(_child) => info!("Launched jarvis-gui"),
         Err(e) => error!("Failed to launch jarvis-gui: {}", e),
     }
 }

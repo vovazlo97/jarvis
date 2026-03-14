@@ -26,7 +26,7 @@ pub async fn reinit(commands: &[JCommandsList]) -> Result<(), String> {
 }
 
 async fn train_and_set_model(commands: &[JCommandsList]) -> Result<(), String> {
-    let current_hash = commands::commands_hash(&commands);
+    let current_hash = commands::commands_hash(commands);
 
     let model = models::intent_classifier::load(models::registry(), "intent-classifier").await?;
 
@@ -47,7 +47,7 @@ async fn train_and_set_model(commands: &[JCommandsList]) -> Result<(), String> {
             "Training intent classifier with {} commands...",
             commands.len()
         );
-        train_classifier(&model.classifier, &commands).await?;
+        train_classifier(&model.classifier, commands).await?;
 
         if let Ok(export) = model.classifier.export_training_data().await {
             let _ = fs::write(&cache_path, export);
@@ -71,8 +71,10 @@ async fn train_and_set_model(commands: &[JCommandsList]) -> Result<(), String> {
 }
 
 pub async fn classify(text: &str) -> Result<IntentPrediction, IntentError> {
-    let guard = MODEL.read();
-    let model = guard.as_ref().expect("IntentClassifier not initialized");
+    let model = {
+        let guard = MODEL.read();
+        Arc::clone(guard.as_ref().expect("IntentClassifier not initialized"))
+    };
     model.classifier.predict_intent(text).await
 }
 

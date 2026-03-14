@@ -11,7 +11,7 @@ pub fn init_logging() -> Result<(), String> {
             APP_LOG_DIR.get().unwrap().display(),
             config::LOG_FILE_NAME
         ))
-        .size(1 * 100)
+        .size(100)
         .roll_count(10)
         .time_format("%Y-%m-%d %H:%M:%S.%f")
         .level("debug")?

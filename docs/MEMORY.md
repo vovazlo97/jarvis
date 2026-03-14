@@ -17,16 +17,17 @@
 
 ## Current State
 
-- **Version:** 0.1.0
-- **Active branch:** develop/phase-a-core-stabilization
-- **Phase:** A — Core Stabilization
-- **Last milestone:** TASK-008 User data persistence — two-layer data model, GUI CRUD writes to user dir, first-run seeding, graceful fallbacks; 67 tests pass; Phase A complete (2026-03-14)
+- **Version:** 0.2.0
+- **Active branch:** docs/phase-b-architecture
+- **Phase:** B — Documentation
+- **Last milestone:** Phase B complete — architecture.md, plugin.md, sdk.md, roadmap.md written; 67 tests pass; clippy clean (2026-03-14)
 
 ## Known Issues & Technical Debt
 
 | Task | Issue | Notes | Status |
 |---|---|---|---|
 | ~~TASK-006~~ | ~~Hot-reload не работает~~ | Root cause найден: intent::reinit() silently skipped embedding backend | Закрыт |
+| ~~TASK-009~~ | ~~`cargo clippy -D warnings` fails — 40 violations~~ | Исправлено: MutexGuard await, &PathBuf→&Path, derivable_impls, dead code; commit dd67850 | Закрыт |
 
 ## Key Contacts & Context
 

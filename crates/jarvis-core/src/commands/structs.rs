@@ -99,7 +99,7 @@ impl Clone for JCommand {
 
             script: self.script.clone(),
             sandbox: self.sandbox.clone(),
-            timeout: self.timeout.clone(),
+            timeout: self.timeout,
 
             sounds: self.sounds.clone(),
             phrases: self.phrases.clone(),

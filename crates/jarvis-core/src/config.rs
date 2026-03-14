@@ -37,19 +37,14 @@ pub fn init_dirs() -> Result<(), String> {
     let mut log_dir = PathBuf::from(&APP_DIRS.get().unwrap().config_dir);
 
     // create dirs, if required
-    if !config_dir.exists() {
-        if fs::create_dir_all(&config_dir).is_err() {
-            config_dir = env::current_dir().expect("Cannot infer the config directory");
-            fs::create_dir_all(&config_dir)
-                .expect("Cannot create config directory, access denied?");
-        }
+    if !config_dir.exists() && fs::create_dir_all(&config_dir).is_err() {
+        config_dir = env::current_dir().expect("Cannot infer the config directory");
+        fs::create_dir_all(&config_dir).expect("Cannot create config directory, access denied?");
     }
 
-    if !log_dir.exists() {
-        if fs::create_dir_all(&log_dir).is_err() {
-            log_dir = env::current_dir().expect("Cannot infer the log directory");
-            fs::create_dir_all(&log_dir).expect("Cannot create log directory, access denied?");
-        }
+    if !log_dir.exists() && fs::create_dir_all(&log_dir).is_err() {
+        log_dir = env::current_dir().expect("Cannot infer the log directory");
+        fs::create_dir_all(&log_dir).expect("Cannot create log directory, access denied?");
     }
 
     // store inferred paths
@@ -97,7 +92,7 @@ pub const TRAY_TOOLTIP: &str = "Jarvis Voice Assistant";
 pub const RUSPOTTER_MIN_SCORE: f32 = 0.62;
 
 #[cfg(feature = "jarvis_app")]
-pub const RUSTPOTTER_DEFAULT_CONFIG: Lazy<RustpotterConfig> = Lazy::new(|| {
+pub static RUSTPOTTER_DEFAULT_CONFIG: Lazy<RustpotterConfig> = Lazy::new(|| {
     RustpotterConfig {
         fmt: AudioFmt::default(),
         detector: DetectorConfig {

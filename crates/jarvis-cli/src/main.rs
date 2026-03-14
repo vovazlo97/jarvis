@@ -195,7 +195,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if arg.is_empty() {
                     println!("  Usage: execute <text>");
                 } else {
-                    execute_text(&command_registry::read(), arg).await;
+                    let snapshot = command_registry::get_snapshot();
+                    execute_text(&snapshot, arg).await;
                 }
             }
             "reload" => {

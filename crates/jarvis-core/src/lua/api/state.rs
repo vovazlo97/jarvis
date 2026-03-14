@@ -3,11 +3,11 @@
 use mlua::{Lua, Result, Table, Value};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const STATE_FILE: &str = ".state.json";
 
-pub fn register(lua: &Lua, jarvis: &Table, command_path: &PathBuf) -> mlua::Result<()> {
+pub fn register(lua: &Lua, jarvis: &Table, command_path: &Path) -> mlua::Result<()> {
     let state = lua.create_table()?;
     let state_path = command_path.join(STATE_FILE);
 

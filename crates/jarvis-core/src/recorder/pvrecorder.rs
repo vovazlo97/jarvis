@@ -52,7 +52,7 @@ pub fn read_microphone(frame_buffer: &mut [i16]) {
     }
 }
 
-pub fn start_recording(device_index: i32, frame_length: u32) -> Result<(), ()> {
+pub fn start_recording(device_index: i32, frame_length: u32) -> Result<(), String> {
     // ensure microphone is initialized
     init_microphone(device_index, frame_length);
 
@@ -68,15 +68,16 @@ pub fn start_recording(device_index: i32, frame_length: u32) -> Result<(), ()> {
             Ok(())
         }
         Err(msg) => {
-            error!("Failed to START audio recording: {}", msg);
+            let err = format!("Failed to START audio recording: {}", msg);
+            error!("{}", err);
 
             // fail
-            Err(())
+            Err(err)
         }
     }
 }
 
-pub fn stop_recording() -> Result<(), ()> {
+pub fn stop_recording() -> Result<(), String> {
     // ensure microphone is initialized & recording is in process
     if RECORDER.get().is_some() && IS_RECORDING.load(Ordering::SeqCst) {
         // stop recording
@@ -91,10 +92,11 @@ pub fn stop_recording() -> Result<(), ()> {
                 return Ok(());
             }
             Err(msg) => {
-                error!("Failed to STOP audio recording: {}", msg);
+                let err = format!("Failed to STOP audio recording: {}", msg);
+                error!("{}", err);
 
                 // fail
-                return Err(());
+                return Err(err);
             }
         }
     }
